@@ -32,6 +32,11 @@ func (tx *TxBuilder) Build() error {
 	if err := signing.Validator.Struct(tx.Ingredient); err != nil {
 		return fmt.Errorf("invalid ingredient: %v", err)
 	}
+	chainId, err := strconv.ParseInt(tx.network, 10, 64)
+	if err != nil {
+		return fmt.Errorf("unsupported chainId %q: %w", tx.network, err)
+	}
+	chainID := big.NewInt(chainId)
 
 	nonce, _ := strconv.ParseUint(tx.Ingredient.Nonce, 10, 64)
 	gasLimit, _ := strconv.ParseUint(tx.Ingredient.GasLimit, 10, 64)
@@ -40,7 +45,6 @@ func (tx *TxBuilder) Build() error {
 	var to common.Address
 	var value *big.Int
 	var ok bool
-	var err error
 	switch tx.Ingredient.TxType {
 	case signing.TxTypeTransfer:
 		if tx.Ingredient.Recipient == "" {
@@ -99,6 +103,7 @@ func (tx *TxBuilder) Build() error {
 		gasFeeCap, _ := new(big.Int).SetString(tx.Ingredient.GasFeeCap, 10)
 		gasTipCap, _ := new(big.Int).SetString(tx.Ingredient.GasTipCap, 10)
 		unsignedTx = types.NewTx(&types.DynamicFeeTx{
+			ChainID:   chainID,
 			Nonce:     nonce,
 			To:        &to,
 			Value:     value,
@@ -113,12 +118,8 @@ func (tx *TxBuilder) Build() error {
 		return fmt.Errorf("failed to MarshalBinary for unsigned, err=%v", err)
 	}
 	tx.unsignedHex = hex.EncodeToString(unsignedBytes)
-	chainId, err := strconv.ParseInt(tx.network, 10, 64)
-	if err != nil {
-		return fmt.Errorf("unsuppored chainId %d", chainId)
-	}
 	tx.sigHash = append(tx.sigHash, strings.TrimPrefix(types.NewLondonSigner(
-		big.NewInt(chainId)).Hash(unsignedTx).Hex(), "0x"))
+		chainID).Hash(unsignedTx).Hex(), "0x"))
 	return nil
 }
 
