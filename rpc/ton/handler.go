@@ -35,7 +35,10 @@ func NewHandler(url string) (*Handler, error) {
 	}
 
 	h := &Handler{}
-	client, _ := liteapi.NewClientWithDefaultMainnet()
+	client, err := liteapi.NewClientWithDefaultMainnet()
+	if err != nil {
+		return nil, fmt.Errorf("fail to create liteapi client, err=%w", err)
+	}
 	h.liteapi = client
 
 	h.api = httpc.NewRequest(tmp[1], map[string]string{
