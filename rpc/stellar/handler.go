@@ -114,7 +114,24 @@ func (h *Handler) GetTransfersByHash(ctx context.Context, hash string, confirmat
 		r.ErrMsg = "not a succeeded tx"
 		return r, nil
 	}
-	amountDecimal, err := decimal.NewFromString(op.Embedded.Records[0].Amount)
+	record := op.Embedded.Records[0]
+	var sender, recipient, amount string
+	switch record.Type {
+	case "payment":
+		if record.AssetType != "native" {
+			r.Rejected = true
+			r.ErrMsg = fmt.Sprintf("unsupported asset type %s", record.AssetType)
+			return r, nil
+		}
+		sender, recipient, amount = record.From, record.To, record.Amount
+	case "create_account":
+		sender, recipient, amount = record.Funder, record.Account, record.StartingBalance
+	default:
+		r.Rejected = true
+		r.ErrMsg = fmt.Sprintf("unsupported operation type %s", record.Type)
+		return r, nil
+	}
+	amountDecimal, err := decimal.NewFromString(amount)
 	if err != nil {
 		r.Rejected = true
 		r.ErrMsg = "fail to NewFromString for Amount"
@@ -122,8 +139,8 @@ func (h *Handler) GetTransfersByHash(ctx context.Context, hash string, confirmat
 	}
 
 	transfer := &chainrpc.Transfer{
-		Sender:          op.Embedded.Records[0].From,
-		Recipient:       op.Embedded.Records[0].To,
+		Sender:          sender,
+		Recipient:       recipient,
 		Amount:          amountDecimal.Shift(int32(h.decimals)).String(),
 		ContractAddress: signing.MagicContactAddressForNative,
 	}
