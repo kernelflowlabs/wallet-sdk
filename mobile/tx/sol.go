@@ -77,6 +77,11 @@ func (b *SolTxBuilder) SetToken2022(is string) *SolTxBuilder {
 	return b
 }
 
+func (b *SolTxBuilder) SetDecimals(decimals string) *SolTxBuilder {
+	b.in.Ingredient.Decimals = decimals
+	return b
+}
+
 func (b *SolTxBuilder) Build() error {
 	if b.err != nil {
 		return b.err

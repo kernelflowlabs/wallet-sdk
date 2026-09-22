@@ -137,15 +137,31 @@ func (tx *TxBuilder) Build() error {
 				if err != nil {
 					return fmt.Errorf("failed to find associated token address for recipient, err=%v", err)
 				}
-				instructionTokenTransfer := tokenprog.Transfer(tokenprog.TransferParam{
-					From: senderTokenPubkey,
-					To:   recipientTokenPubkey,
-					Auth: senderPubkey,
-					Signers: []common.PublicKey{
-						senderPubkey,
-					},
-					Amount: amount,
-				})
+				var instructionTokenTransfer types.Instruction
+				if is2022 {
+					decimals, err := strconv.ParseUint(tx.Ingredient.Decimals, 10, 8)
+					if err != nil {
+						return fmt.Errorf("decimals required for Token-2022 transfers, got %q", tx.Ingredient.Decimals)
+					}
+					instructionTokenTransfer = tokenprog.TransferChecked(tokenprog.TransferCheckedParam{
+						From:     senderTokenPubkey,
+						To:       recipientTokenPubkey,
+						Mint:     contractPubkey,
+						Auth:     senderPubkey,
+						Amount:   amount,
+						Decimals: uint8(decimals),
+					})
+				} else {
+					instructionTokenTransfer = tokenprog.Transfer(tokenprog.TransferParam{
+						From: senderTokenPubkey,
+						To:   recipientTokenPubkey,
+						Auth: senderPubkey,
+						Signers: []common.PublicKey{
+							senderPubkey,
+						},
+						Amount: amount,
+					})
+				}
 				instructionTokenTransfer.ProgramID = TokenProgramOf(is2022)
 				if tx.Ingredient.HasATA == "true" {
 					instructions = append(instructions, instructionTokenTransfer)
@@ -319,6 +335,7 @@ type (
 		UnitLimit                      string `json:"unitLimit,omitempty" validate:"omitempty,u64_gt0"`
 		HasATA                         string `json:"hasATA,omitempty" validate:"omitempty,bool_str"`
 		Token2022                      string `json:"token2022,omitempty" validate:"omitempty,bool_str"`
+		Decimals                       string `json:"decimals,omitempty" validate:"omitempty,u64"`
 		RefBlockHash                   string `json:"refBlockHash,omitempty"`
 		UseNonceAccount                string `json:"useNonceAccount,omitempty"`
 		NonceAccount                   string `json:"nonceAccount,omitempty"`
