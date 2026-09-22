@@ -39,26 +39,18 @@ func VerifySignatureWithBlake2b(publicKey, data, sig []byte) bool {
 	if err != nil {
 		return false
 	}
-	blake2b256, err := blake2b.New256(data)
-	if err != nil {
-		return false
-	}
-	hash := blake2b256.Sum(nil)
+	hash := blake2b.Sum256(data)
 	signature, err := schnorr.ParseSignature(sig)
 	if err != nil {
 		return false
 	}
-	return signature.Verify(hash, pub)
+	return signature.Verify(hash[:], pub)
 }
 
 func SignWithPrivateKeyWithBlake2b(privateKeyBytes, data []byte) ([]byte, error) {
-	blake2b256, err := blake2b.New256(data)
-	if err != nil {
-		return nil, err
-	}
-	hash := blake2b256.Sum(nil)
+	hash := blake2b.Sum256(data)
 	prvKey, _ := btcec.PrivKeyFromBytes(privateKeyBytes)
-	signature, err := schnorr.Sign(prvKey, hash)
+	signature, err := schnorr.Sign(prvKey, hash[:])
 	if err != nil {
 		return nil, err
 	}
