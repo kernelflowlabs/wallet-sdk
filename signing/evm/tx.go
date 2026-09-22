@@ -96,6 +96,9 @@ func (tx *TxBuilder) Build() error {
 	}
 	unsignedTx := &types.Transaction{}
 	if tx.Ingredient.IsLegacyTx == "true" {
+		if tx.Ingredient.GasPrice == "" {
+			return fmt.Errorf("gasPrice required for legacy transactions")
+		}
 		gasPrice, _ := new(big.Int).SetString(tx.Ingredient.GasPrice, 10)
 		unsignedTx = types.NewTx(&types.LegacyTx{
 			Nonce:    nonce,
@@ -106,8 +109,14 @@ func (tx *TxBuilder) Build() error {
 			Data:     data,
 		})
 	} else {
+		if tx.Ingredient.GasFeeCap == "" || tx.Ingredient.GasTipCap == "" {
+			return fmt.Errorf("gasFeeCap and gasTipCap required for EIP-1559 transactions")
+		}
 		gasFeeCap, _ := new(big.Int).SetString(tx.Ingredient.GasFeeCap, 10)
 		gasTipCap, _ := new(big.Int).SetString(tx.Ingredient.GasTipCap, 10)
+		if gasTipCap.Cmp(gasFeeCap) > 0 {
+			return fmt.Errorf("gasTipCap %s exceeds gasFeeCap %s", gasTipCap, gasFeeCap)
+		}
 		unsignedTx = types.NewTx(&types.DynamicFeeTx{
 			ChainID:   chainID,
 			Nonce:     nonce,
