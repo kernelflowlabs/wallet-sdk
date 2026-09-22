@@ -72,7 +72,7 @@ func hash(ingest []byte, cfg *blake2b.Config) ([]byte, error) {
 }
 
 func addressToBytes(addr string) []byte {
-	if len(addr) == 0 {
+	if len(addr) < 3 {
 		return nil
 	}
 	if string(addr[0]) != MainnetPrefix {
@@ -104,7 +104,7 @@ func addressToBytes(addr string) []byte {
 	}
 
 	payloadcksm, err := AddressEncoding.WithPadding(-1).DecodeString(raw)
-	if err != nil {
+	if err != nil || len(payloadcksm) < ChecksumHashLength {
 		return nil
 	}
 	payload := payloadcksm[:len(payloadcksm)-4]
