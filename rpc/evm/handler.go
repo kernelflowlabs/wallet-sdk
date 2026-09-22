@@ -57,7 +57,7 @@ func (h *Handler) GetHeight(ctx context.Context) (string, error) {
 	} else if blockNumber == "" || blockNumber == "0" {
 		return "", fmt.Errorf("got zero")
 	}
-	height, err := strconv.ParseUint(blockNumber, 0, 32)
+	height, err := strconv.ParseUint(blockNumber, 0, 64)
 	if err != nil {
 		return "", fmt.Errorf("failed to ParseUint for blockNumber, err=%v", err)
 	}
