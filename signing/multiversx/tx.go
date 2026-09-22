@@ -145,7 +145,7 @@ type (
 	NetWorkConfig struct {
 		GasPrice string `json:"gasPrice" validate:"required,u64_gt0"`
 		GasLimit string `json:"gasLimit" validate:"required,u64_gt0"`
-		ChainID  string `json:"chainID"  validate:"required,u64"`
+		ChainID  string `json:"chainID"  validate:"required,alphanum"`
 		Version  string `json:"version"  validate:"required,u64"`
 	}
 	Ingredient struct {
