@@ -39,9 +39,10 @@ func NewTxBuilderFromUnsignedHex(unsignedHex string) (*TxBuilder, error) {
 	}
 
 	return &TxBuilder{
-		Ingredient:  &Ingredient{},
-		unsignedHex: hex.EncodeToString(txBytes),
-		sigHash:     []string{hex.EncodeToString(msgBytes)},
+		Ingredient:      &Ingredient{},
+		unsignedHex:     hex.EncodeToString(txBytes),
+		sigHash:         []string{hex.EncodeToString(msgBytes)},
+		fromUnsignedHex: true,
 	}, nil
 }
 
@@ -51,12 +52,9 @@ func (tx *TxBuilder) Build() error {
 	}
 	tx.sigHash = nil
 	tx.txHash = ""
-	if err := signing.Validator.Struct(tx.Ingredient); err != nil {
-		return fmt.Errorf("invalid ingredient: %v", err)
-	}
 
 	var ntx types.Transaction
-	if tx.unsignedHex != "" {
+	if tx.fromUnsignedHex {
 		ntxBytes, err := hex.DecodeString(tx.unsignedHex)
 		if err != nil {
 			return fmt.Errorf("failed to DecodeString for UnsignedHex, err=%v", err)
@@ -68,6 +66,9 @@ func (tx *TxBuilder) Build() error {
 		tx.Ingredient = &Ingredient{}
 		tx.RefBlockHash = ntx.Message.RecentBlockHash
 	} else {
+		if err := signing.Validator.Struct(tx.Ingredient); err != nil {
+			return fmt.Errorf("invalid ingredient: %v", err)
+		}
 		senderPubkey := common.PublicKeyFromString(tx.Ingredient.Sender)
 
 		var instructions []types.Instruction
@@ -345,9 +346,10 @@ type (
 
 	TxBuilder struct {
 		*Ingredient
-		unsignedHex string
-		sigHash     []string
-		txHash      string
+		unsignedHex     string
+		sigHash         []string
+		txHash          string
+		fromUnsignedHex bool
 	}
 )
 
