@@ -16,6 +16,7 @@ const (
 	PublicNetworkPassphrase = "Public Global Stellar Network ; September 2015"
 	TestNetworkPassphrase   = "Test SDF Network ; September 2015"
 	MinBaseFee              = 100
+	MinAccountBalance       = 10000000
 )
 
 func NewTxBuilder(ti *Ingredient) *TxBuilder {
@@ -52,8 +53,8 @@ func (tx *TxBuilder) Build() error {
 	op := stellarOp{destKey: recipientBytes, amount: amount}
 	if tx.Ingredient.IsRecipientActivated == "true" {
 		op.isPayment = true
-	} else if amount < 1000000 {
-		return fmt.Errorf("amount must be greater than 1 since recipient is not activated yet")
+	} else if amount < MinAccountBalance {
+		return fmt.Errorf("amount %d is below the %d stroops needed to create an account", amount, MinAccountBalance)
 	}
 	mtx := stellarTx{
 		sourceKey: senderBytes,
