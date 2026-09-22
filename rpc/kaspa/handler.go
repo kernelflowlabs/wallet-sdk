@@ -23,7 +23,7 @@ import (
 var _ chainrpc.BasicChainHandler = (*Handler)(nil)
 
 type Handler struct {
-	client     rpcclient.RPCClient
+	client     *rpcclient.RPCClient
 	scanApi    *httpc.Request
 	kasplexApi *httpc.Request
 }
@@ -38,7 +38,7 @@ func NewHandler(url string) (*Handler, error) {
 		return nil, fmt.Errorf("failed to NewRPCClient, err=%v", err)
 	}
 	client.SetTimeout(10 * time.Second)
-	h.client = *client
+	h.client = client
 	return h, nil
 }
 
