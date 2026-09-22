@@ -280,6 +280,7 @@ func (tx *TxBuilder) SetUnsignedHex(unsignedHex string) {
 const DefaultInputBytes = 148
 const DefaultOutputBytes = 34
 const DefaultDust = 546
+const DogeDust = 100000
 
 const (
 	vbytesP2WPKHInput = 68
@@ -298,6 +299,27 @@ func estimateVBytes(network string, numInputs, numOutputs int) int64 {
 		perInput = bytesP2PKHInput
 	}
 	return int64(numInputs)*perInput + int64(numOutputs)*bytesOutput + bytesOverhead
+}
+
+func buildMemoScript(memo string) ([]byte, error) {
+	if memo == "" {
+		return nil, nil
+	}
+	if len(memo) > 80 {
+		return nil, fmt.Errorf("memo too long")
+	}
+	script, err := txscript.NewScriptBuilder().AddOp(txscript.OP_RETURN).AddData([]byte(memo)).Script()
+	if err != nil {
+		return nil, fmt.Errorf("failed to Script for memo, err=%v", err)
+	}
+	return script, nil
+}
+
+func memoOutputVBytes(script []byte) int64 {
+	if script == nil {
+		return 0
+	}
+	return int64(8 + wire.VarIntSerializeSize(uint64(len(script))) + len(script))
 }
 
 func estimateFee(network string, byteFee int64, numInputs, numOutputs int) int64 {
@@ -354,10 +376,15 @@ func buildForBTC(i *Ingredient) ([]string, string, error) {
 
 	byteFee, _ := strconv.ParseInt(i.ByteFee, 10, 64)
 	numInputs := len(i.Utxos.List)
+	memoScript, err := buildMemoScript(i.Memo)
+	if err != nil {
+		return nil, "", err
+	}
+	memoFee := memoOutputVBytes(memoScript) * byteFee
 	var toAddrArr []string
 	var toAmountArr []int64
 	if i.Amount == signing.MagicNumberForMaxAmount {
-		fee := estimateFee(NetworkEnumForBTC, byteFee, numInputs, 1)
+		fee := estimateFee(NetworkEnumForBTC, byteFee, numInputs, 1) + memoFee
 		send := totalHas - fee
 		if send < DefaultDust {
 			return nil, "", fmt.Errorf("sweep amount below dust: totalHas=%d, fee=%d", totalHas, fee)
@@ -371,13 +398,13 @@ func buildForBTC(i *Ingredient) ([]string, string, error) {
 		}
 		toAddrArr = append(toAddrArr, i.Recipient)
 		toAmountArr = append(toAmountArr, value)
-		feeWithChange := estimateFee(NetworkEnumForBTC, byteFee, numInputs, 2)
+		feeWithChange := estimateFee(NetworkEnumForBTC, byteFee, numInputs, 2) + memoFee
 		change := totalHas - feeWithChange - value
 		if change >= DefaultDust {
 			toAddrArr = append(toAddrArr, i.Sender)
 			toAmountArr = append(toAmountArr, change)
 		} else {
-			feeNoChange := estimateFee(NetworkEnumForBTC, byteFee, numInputs, 1)
+			feeNoChange := estimateFee(NetworkEnumForBTC, byteFee, numInputs, 1) + memoFee
 			if totalHas-feeNoChange-value < 0 {
 				return nil, "", fmt.Errorf("value too large, totalHas=%d, value=%d, fee=%d", totalHas, value, feeNoChange)
 			}
@@ -410,18 +437,8 @@ func buildForBTC(i *Ingredient) ([]string, string, error) {
 		msgTx.AddTxOut(txOut)
 	}
 
-	if i.Memo != "" {
-		if len(i.Memo) > 80 {
-			return nil, "", fmt.Errorf("memo too long")
-		}
-		sb := txscript.NewScriptBuilder()
-		sb.AddOp(txscript.OP_RETURN)
-		sb.AddData([]byte(i.Memo))
-		sbScript, err := sb.Script()
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to Script for memo, err=%v", err)
-		}
-		msgTx.AddTxOut(wire.NewTxOut(0, sbScript))
+	if memoScript != nil {
+		msgTx.AddTxOut(wire.NewTxOut(0, memoScript))
 	}
 	/*
 		{
@@ -596,36 +613,41 @@ func buildForDOGE(i *Ingredient) ([]string, string, error) {
 	byteFee, _ := strconv.ParseInt(i.ByteFee, 10, 64)
 	numInputs := len(i.Utxos.List)
 	const dogeMinFee = 5000000
+	memoScript, err := buildMemoScript(i.Memo)
+	if err != nil {
+		return nil, "", err
+	}
+	memoFee := memoOutputVBytes(memoScript) * byteFee
 	var toAddrArr []string
 	var toAmountArr []int64
 	if i.Amount == signing.MagicNumberForMaxAmount {
-		fee := estimateFee(NetworkEnumForDOGE, byteFee, numInputs, 1)
+		fee := estimateFee(NetworkEnumForDOGE, byteFee, numInputs, 1) + memoFee
 		if fee < dogeMinFee {
 			fee = dogeMinFee
 		}
 		send := totalHas - fee
-		if send < DefaultDust {
+		if send < DogeDust {
 			return nil, "", fmt.Errorf("sweep amount below dust: totalHas=%d, fee=%d", totalHas, fee)
 		}
 		toAddrArr = append(toAddrArr, i.Recipient)
 		toAmountArr = append(toAmountArr, send)
 	} else {
 		value, _ := strconv.ParseInt(i.Amount, 10, 64)
-		if value < DefaultDust {
+		if value < DogeDust {
 			return nil, "", fmt.Errorf("amount below dust: %d", value)
 		}
-		feeWithChange := estimateFee(NetworkEnumForDOGE, byteFee, numInputs, 2)
+		feeWithChange := estimateFee(NetworkEnumForDOGE, byteFee, numInputs, 2) + memoFee
 		if feeWithChange < dogeMinFee {
 			feeWithChange = dogeMinFee
 		}
 		toAddrArr = append(toAddrArr, i.Recipient)
 		toAmountArr = append(toAmountArr, value)
 		change := totalHas - feeWithChange - value
-		if change >= DefaultDust {
+		if change >= DogeDust {
 			toAddrArr = append(toAddrArr, i.Sender)
 			toAmountArr = append(toAmountArr, change)
 		} else {
-			feeNoChange := estimateFee(NetworkEnumForDOGE, byteFee, numInputs, 1)
+			feeNoChange := estimateFee(NetworkEnumForDOGE, byteFee, numInputs, 1) + memoFee
 			if feeNoChange < dogeMinFee {
 				feeNoChange = dogeMinFee
 			}
@@ -661,18 +683,8 @@ func buildForDOGE(i *Ingredient) ([]string, string, error) {
 		msgTx.AddTxOut(txOut)
 	}
 
-	if i.Memo != "" {
-		if len(i.Memo) > 80 {
-			return nil, "", fmt.Errorf("memo too long")
-		}
-		sb := txscript.NewScriptBuilder()
-		sb.AddOp(txscript.OP_RETURN)
-		sb.AddData([]byte(i.Memo))
-		sbScript, err := sb.Script()
-		if err != nil {
-			return nil, "", fmt.Errorf("failed to Script for memo, err=%v", err)
-		}
-		msgTx.AddTxOut(wire.NewTxOut(0, sbScript))
+	if memoScript != nil {
+		msgTx.AddTxOut(wire.NewTxOut(0, memoScript))
 	}
 	/*
 		{
