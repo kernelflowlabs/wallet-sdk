@@ -1,6 +1,10 @@
 package near
 
-import "fmt"
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+)
 
 func (err *ErrorResponse) Error() string {
 	return fmt.Sprintf("RPC ERROR code=%d,message=%s,data=%s", err.Code, err.Message, err.Data)
@@ -160,12 +164,7 @@ type (
 				Hash      string `json:"hash"`
 			} `json:"proof"`
 		} `json:"receipts_outcome"`
-		Status struct {
-			SuccessValue     string      `json:"SuccessValue,omitempty"`
-			SuccessReceiptId string      `json:"SuccessReceiptId,omitempty"`
-			Failure          interface{} `json:"Failure,omitempty"`
-			Unknown          string      `json:"Unknown,omitempty"`
-		} `json:"status"`
+		Status      ExecutionStatus `json:"status"`
 		Transaction struct {
 			Actions []struct {
 				Transfer struct {
@@ -242,3 +241,29 @@ type (
 		Amount     string `json:"amount"`
 	}
 )
+
+type ExecutionStatus struct {
+	SuccessValue     *string     `json:"SuccessValue,omitempty"`
+	SuccessReceiptId *string     `json:"SuccessReceiptId,omitempty"`
+	Failure          interface{} `json:"Failure,omitempty"`
+	Unknown          string      `json:"Unknown,omitempty"`
+}
+
+func (s *ExecutionStatus) UnmarshalJSON(data []byte) error {
+	trimmed := bytes.TrimSpace(data)
+	if len(trimmed) > 0 && trimmed[0] == '"' {
+		var name string
+		if err := json.Unmarshal(trimmed, &name); err != nil {
+			return err
+		}
+		*s = ExecutionStatus{Unknown: name}
+		return nil
+	}
+	type plain ExecutionStatus
+	var out plain
+	if err := json.Unmarshal(trimmed, &out); err != nil {
+		return err
+	}
+	*s = ExecutionStatus(out)
+	return nil
+}

@@ -174,29 +174,20 @@ func (h *Handler) CheckTx(ctx context.Context, hash string) (*chainrpc.TxResult,
 	if err != nil {
 		return r, fmt.Errorf("fail to getTransactionReceipt, err=%v", err)
 	}
-	if receipt.Status.Failure != nil {
+	switch {
+	case receipt.Status.Failure != nil:
 		r.Status = signing.TxStatusFailed
-	} else if receipt.Status.SuccessValue == "" {
-		receiptsOutcomeSucceed := true
-		for _, receiptsOutcome := range receipt.ReceiptsOutcome {
-			if receiptsOutcome.Outcome.Status.SuccessValue != "" {
-				receiptsOutcomeSucceed = false
-			}
+	case receipt.Status.SuccessValue != nil:
+		r.Status = signing.TxStatusSucceeded
+		block, err := h.getBlockByHash(ctx, receipt.TransactionOutcome.BlockHash)
+		if err != nil {
+			return r, fmt.Errorf("fail to getBlockByHash, err=%w", err)
 		}
-		if receiptsOutcomeSucceed {
-			r.Status = signing.TxStatusSucceeded
-			block, err := h.getBlockByHash(ctx, receipt.TransactionOutcome.BlockHash)
-			if err != nil {
-				return r, fmt.Errorf("fail to getBlockByHash, err=%v", err)
-			}
-			r.Height = strconv.FormatInt(block.Header.Height, 10)
-			if block.Header.Timestamp > 1000000000 {
-				r.Time = strconv.FormatInt(block.Header.Timestamp/1000000000, 10)
-			}
-		} else {
-			r.Status = signing.TxStatusPending
+		r.Height = strconv.FormatInt(block.Header.Height, 10)
+		if block.Header.Timestamp > 1000000000 {
+			r.Time = strconv.FormatInt(block.Header.Timestamp/1000000000, 10)
 		}
-	} else {
+	default:
 		r.Status = signing.TxStatusPending
 	}
 	return r, nil
