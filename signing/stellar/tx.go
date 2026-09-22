@@ -26,6 +26,9 @@ func (tx *TxBuilder) Build() error {
 	if tx == nil {
 		return fmt.Errorf("tx == nil")
 	}
+	tx.sigHash = nil
+	tx.unsignedHex = ""
+	tx.txHash = ""
 	if tx.Ingredient.ContractAddress != signing.MagicContactAddressForNative {
 		return fmt.Errorf("only basecoin supported on this chain")
 	}

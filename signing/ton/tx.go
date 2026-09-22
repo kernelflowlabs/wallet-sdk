@@ -32,6 +32,9 @@ func (tx *TxBuilder) Build() error {
 	if tx == nil {
 		return fmt.Errorf("tx == nil")
 	}
+	tx.sigHash = nil
+	tx.unsignedHex = ""
+	tx.txHash = ""
 	amountBig, ok := big.NewInt(0).SetString(tx.Ingredient.Amount, 10)
 	if !ok {
 		return fmt.Errorf("fail to SetString Amount")

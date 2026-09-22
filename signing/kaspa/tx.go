@@ -28,6 +28,9 @@ func (tx *TxBuilder) Build() error {
 	if tx == nil {
 		return fmt.Errorf("tx == nil")
 	}
+	tx.sigHash = nil
+	tx.unsignedHex = ""
+	tx.txHash = ""
 	senderVersion, senderPubkey, err := decodeAddress(tx.Ingredient.Sender, bech32PrefixKaspaMainnet)
 	if err != nil {
 		return fmt.Errorf("failed to DecodeAddress for Sender, err=%v", err)
