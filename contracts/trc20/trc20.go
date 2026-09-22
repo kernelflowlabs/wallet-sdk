@@ -83,6 +83,12 @@ func PackPayloadForTrc20(function string, params []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	switch function {
+	case "mint", "burn", "transfer", "transferFrom", "approve":
+		if pp.Amount == nil {
+			return "", fmt.Errorf("amount is required for %s", function)
+		}
+	}
 	var data []byte
 
 	switch function {
