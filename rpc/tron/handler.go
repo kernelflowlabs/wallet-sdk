@@ -163,7 +163,7 @@ func (h *Handler) GetTransfersByHash(ctx context.Context, hash string,
 			})
 			result.BalanceChange = append(result.BalanceChange, &chainrpc.BalanceChange{
 				Address:         transfer.Recipient,
-				ContractAddress: signing.MagicContactAddressForNative,
+				ContractAddress: transfer.ContractAddress,
 				Change:          amt.String(),
 			})
 		}
