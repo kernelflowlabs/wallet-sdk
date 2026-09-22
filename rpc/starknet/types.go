@@ -68,10 +68,16 @@ type (
 	GetTransaction struct {
 		BaseResponse
 		Result struct {
-			BlockNumber     int    `json:"block_number"`
-			ExecutionStatus string `json:"execution_status"`
-			FinalityStatus  string `json:"finality_status"`
-			TransactionHash string `json:"transaction_hash"`
+			BlockNumber     int            `json:"block_number"`
+			ExecutionStatus string         `json:"execution_status"`
+			FinalityStatus  string         `json:"finality_status"`
+			TransactionHash string         `json:"transaction_hash"`
+			Events          []ReceiptEvent `json:"events"`
 		} `json:"result"`
+	}
+	ReceiptEvent struct {
+		FromAddress string   `json:"from_address"`
+		Keys        []string `json:"keys"`
+		Data        []string `json:"data"`
 	}
 )

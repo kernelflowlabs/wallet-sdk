@@ -88,28 +88,58 @@ func (h *Handler) GetTransfersByHash(ctx context.Context, hash string, confirmat
 		return r, nil
 	}
 
-	req := &BaseRequest{JsonRPC: "2.0", ID: "0", Method: "starknet_getTransactionByHash",
-		Params: []string{hash}}
-	res := &GetTransactionByHash{}
-	if err := h.rpc.Post(ctx, res, "", req); err != nil {
-		return nil, fmt.Errorf("fail to getTransactionByHash, err=%v", err)
-	} else if res.Error != nil {
-		return nil, fmt.Errorf("fail to getTransactionByHash, errMsg=%v", res.Error.Message)
-	} else if len(res.Result.Calldata) != 7 {
-		r.Rejected = true
-		r.ErrMsg = "unsupported calldata shape"
+	confirmed, err := chainrpc.Confirmations(ctx, txResult.Height, confirmation, h.GetHeight)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check confirmations, err=%w", err)
+	}
+	if confirmed < confirmation {
+		r.ErrMsg = fmt.Sprintf("tx succeeded.But current confirmation number %d hasn't meet "+
+			"expected number %d", confirmed, confirmation)
 		return r, nil
 	}
-	contractAddress := expandAddress(res.Result.Calldata[1])
-	if contractAddress == ethContractAddress {
-		contractAddress = signing.MagicContactAddressForNative
+
+	req := &BaseRequest{JsonRPC: "2.0", ID: "0", Method: "starknet_getTransactionReceipt",
+		Params: []string{hash}}
+	res := &GetTransaction{}
+	if err := h.rpc.Post(ctx, res, "", req); err != nil {
+		return nil, fmt.Errorf("fail to getTransactionReceipt, err=%w", err)
+	} else if res.Error != nil {
+		return nil, fmt.Errorf("fail to getTransactionReceipt, errMsg=%v", res.Error.Message)
+	} else if res.Result.ExecutionStatus != "SUCCEEDED" {
+		r.Rejected = true
+		r.ErrMsg = "not a succeeded tx"
+		return r, nil
 	}
-	r.Transfers = append(r.Transfers, &chainrpc.Transfer{
-		Sender:          expandAddress(res.Result.SenderAddress),
-		Recipient:       expandAddress(res.Result.Calldata[4]),
-		Amount:          hexToBig(res.Result.Calldata[5]).String(),
-		ContractAddress: contractAddress,
-	})
+	transferSelector := caigotypes.GetSelectorFromName("Transfer")
+	for _, ev := range res.Result.Events {
+		if len(ev.Keys) == 0 || hexToBig(ev.Keys[0]).Cmp(transferSelector) != 0 {
+			continue
+		}
+		var from, to, low, high string
+		switch {
+		case len(ev.Keys) == 3 && len(ev.Data) == 2:
+			from, to, low, high = ev.Keys[1], ev.Keys[2], ev.Data[0], ev.Data[1]
+		case len(ev.Keys) == 1 && len(ev.Data) == 4:
+			from, to, low, high = ev.Data[0], ev.Data[1], ev.Data[2], ev.Data[3]
+		default:
+			continue
+		}
+		amount := new(big.Int).Add(hexToBig(low), new(big.Int).Lsh(hexToBig(high), 128))
+		contractAddress := expandAddress(ev.FromAddress)
+		if contractAddress == ethContractAddress {
+			contractAddress = signing.MagicContactAddressForNative
+		}
+		r.Transfers = append(r.Transfers, &chainrpc.Transfer{
+			Sender:          expandAddress(from),
+			Recipient:       expandAddress(to),
+			Amount:          amount.String(),
+			ContractAddress: contractAddress,
+		})
+	}
+	if len(r.Transfers) == 0 {
+		r.Rejected = true
+		r.ErrMsg = "no transfer events"
+	}
 	return r, nil
 }
 
