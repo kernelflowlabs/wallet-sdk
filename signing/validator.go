@@ -4,7 +4,6 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
-	"unicode"
 
 	"github.com/go-playground/validator/v10"
 )
@@ -67,11 +66,11 @@ func init() {
 			s = s[2:]
 		}
 
-		if s == "" {
+		if s == "" || len(s)%2 != 0 {
 			return false
 		}
 		for _, c := range s {
-			if !unicode.IsDigit(c) &&
+			if (c < '0' || c > '9') &&
 				(c < 'a' || c > 'f') &&
 				(c < 'A' || c > 'F') {
 				return false

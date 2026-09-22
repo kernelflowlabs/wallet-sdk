@@ -9,6 +9,7 @@ import (
 	"github.com/kernelflowlabs/wallet-sdk/crypto/key"
 	"github.com/kernelflowlabs/wallet-sdk/signing"
 	"strconv"
+	"strings"
 )
 
 func NewTxBuilder(ti *Ingredient) *TxBuilder {
@@ -99,7 +100,10 @@ func (tx *TxBuilder) Build() error {
 		typeUrl = "type.googleapis.com/protocol." + contractTypeName[txType]
 		feeLimit, _ = strconv.ParseInt(tx.Ingredient.FeeLimit, 10, 64)
 		contractAddressBytes = ConvertToBytes(tx.Ingredient.ContractAddress)
-		payload, _ = hex.DecodeString(tx.Ingredient.Payload)
+		payload, err = hex.DecodeString(strings.TrimPrefix(tx.Ingredient.Payload, "0x"))
+		if err != nil {
+			return fmt.Errorf("invalid payload: %v", err)
+		}
 		if tx.Ingredient.Amount != "" {
 			amount, _ = strconv.ParseInt(tx.Ingredient.Amount, 10, 64)
 		}

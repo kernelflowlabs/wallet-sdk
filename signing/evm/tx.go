@@ -60,7 +60,10 @@ func (tx *TxBuilder) Build() error {
 			}
 			to = common.HexToAddress(tx.Ingredient.Recipient)
 			if tx.Ingredient.Memo != "" {
-				data, _ = hex.DecodeString(tx.Ingredient.Memo)
+				data, err = hex.DecodeString(strings.TrimPrefix(tx.Ingredient.Memo, "0x"))
+				if err != nil {
+					return fmt.Errorf("invalid memo: %v", err)
+				}
 			}
 		} else {
 			to = common.HexToAddress(tx.Ingredient.ContractAddress)
@@ -78,10 +81,13 @@ func (tx *TxBuilder) Build() error {
 		}
 	case signing.TxTypeContractCall:
 		to = common.HexToAddress(tx.Ingredient.ContractAddress)
-		if len(tx.Ingredient.Payload) < 8 {
+		data, err = hex.DecodeString(strings.TrimPrefix(tx.Ingredient.Payload, "0x"))
+		if err != nil {
+			return fmt.Errorf("invalid payload: %v", err)
+		}
+		if len(data) < 4 {
 			return fmt.Errorf("payload too short")
 		}
-		data, _ = hex.DecodeString(strings.TrimPrefix(tx.Ingredient.Payload, "0x"))
 		if tx.Ingredient.Amount != "" {
 			value, _ = big.NewInt(0).SetString(tx.Ingredient.Amount, 10)
 		}
