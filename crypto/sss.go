@@ -5,8 +5,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/kernelflowlabs/wallet-sdk/crypto/bip"
 	"strings"
+
+	"github.com/kernelflowlabs/wallet-sdk/crypto/bip"
 
 	"github.com/hashicorp/vault/shamir"
 )
@@ -40,21 +41,16 @@ func SSSCombine(shares [][]byte) ([]byte, error) {
 	return data, nil
 }
 
-const (
-	TotalShares     = 2
-	ThresholdShares = 2
-)
-
-func PerformSplit(mn string) ([]string, error) {
-	entropy, err := bip.EntropyFromMnemonic(mn)
+func PerformSplit(str string, totalShares, thresholdShares int) ([]string, error) {
+	entropy, err := bip.EntropyFromMnemonic(str)
 	if err != nil {
-		return nil, fmt.Errorf("invalid mn: %v", err)
+		return nil, fmt.Errorf("invalid str: %v", err)
 	}
 
 	fullHash := sha256.Sum256(entropy)
 	fingerprint := hex.EncodeToString(fullHash[:4])
 
-	shares, err := SSSSplit(entropy, TotalShares, ThresholdShares)
+	shares, err := SSSSplit(entropy, totalShares, thresholdShares)
 	if err != nil {
 		return nil, err
 	}
