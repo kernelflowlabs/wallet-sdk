@@ -3,13 +3,13 @@ package stellar
 import "fmt"
 import "time"
 
-func (err *_ErrorResponse) Error() string {
+func (err *ErrorResponse) Error() string {
 	return fmt.Sprintf("RPC ERROR title=%s,status=%d,detail=%s,extras=%v",
 		err.Title, err.Status, err.Detail, err.Extras)
 }
 
 type (
-	_ErrorResponse struct {
+	ErrorResponse struct {
 		Title  string `json:"title"`
 		Status int    `json:"status"`
 		Detail string `json:"detail"`
@@ -22,17 +22,17 @@ type (
 			ResultXdr string `json:"result_xdr"`
 		} `json:"extras"`
 	}
-	_HalLink struct {
+	HalLink struct {
 		Href      string `json:"href"`
 		Templated bool   `json:"templated,omitempty"`
 	}
-	_RpcBase struct {
+	RpcBase struct {
 		Links struct {
-			Self        _HalLink `json:"self"`
-			Transaction _HalLink `json:"transaction"`
-			Effects     _HalLink `json:"effects"`
-			Succeeds    _HalLink `json:"succeeds"`
-			Precedes    _HalLink `json:"precedes"`
+			Self        HalLink `json:"self"`
+			Transaction HalLink `json:"transaction"`
+			Effects     HalLink `json:"effects"`
+			Succeeds    HalLink `json:"succeeds"`
+			Precedes    HalLink `json:"precedes"`
 		} `json:"_links"`
 		TransactionSuccessful bool   `json:"transaction_successful"`
 		SourceAccount         string `json:"source_account"`
@@ -41,13 +41,13 @@ type (
 		ID                    string `json:"id"`
 		TransactionHash       string `json:"transaction_hash"`
 	}
-	_Ledger struct {
+	Ledger struct {
 		Links struct {
-			Self         _HalLink `json:"self"`
-			Transactions _HalLink `json:"transactions"`
-			Operations   _HalLink `json:"operations"`
-			Payments     _HalLink `json:"payments"`
-			Effects      _HalLink `json:"effects"`
+			Self         HalLink `json:"self"`
+			Transactions HalLink `json:"transactions"`
+			Operations   HalLink `json:"operations"`
+			Payments     HalLink `json:"payments"`
+			Effects      HalLink `json:"effects"`
 		} `json:"_links"`
 		ID                         string    `json:"id"`
 		PT                         string    `json:"paging_token"`
@@ -67,14 +67,14 @@ type (
 		ProtocolVersion            int32     `json:"protocol_version"`
 		HeaderXDR                  string    `json:"header_xdr"`
 	}
-	_LedgersPageRes struct {
-		_ErrorResponse
-		Links    _HalLink `json:"_links"`
+	LedgersPageRes struct {
+		ErrorResponse
+		Links    HalLink `json:"_links"`
 		Embedded struct {
-			Records []_Ledger
+			Records []Ledger
 		} `json:"_embedded"`
 	}
-	_Balance struct {
+	Balance struct {
 		Balance                           string `json:"balance"`
 		LiquidityPoolId                   string `json:"liquidity_pool_id,omitempty"`
 		Limit                             string `json:"limit,omitempty"`
@@ -89,17 +89,17 @@ type (
 		AssetCode                         string `json:"asset_code,omitempty"`
 		AssetIssuer                       string `json:"asset_issuer,omitempty"`
 	}
-	_AccountRes struct {
-		_ErrorResponse
+	AccountRes struct {
+		ErrorResponse
 		Links struct {
-			Self         _HalLink `json:"self"`
-			Transactions _HalLink `json:"transactions"`
-			Operations   _HalLink `json:"operations"`
-			Payments     _HalLink `json:"payments"`
-			Effects      _HalLink `json:"effects"`
-			Offers       _HalLink `json:"offers"`
-			Trades       _HalLink `json:"trades"`
-			Data         _HalLink `json:"data"`
+			Self         HalLink `json:"self"`
+			Transactions HalLink `json:"transactions"`
+			Operations   HalLink `json:"operations"`
+			Payments     HalLink `json:"payments"`
+			Effects      HalLink `json:"effects"`
+			Offers       HalLink `json:"offers"`
+			Trades       HalLink `json:"trades"`
+			Data         HalLink `json:"data"`
 		} `json:"_links"`
 
 		ID                   string            `json:"id"`
@@ -110,79 +110,79 @@ type (
 		HomeDomain           string            `json:"home_domain,omitempty"`
 		LastModifiedLedger   uint32            `json:"last_modified_ledger"`
 		LastModifiedTime     *time.Time        `json:"last_modified_time"`
-		Balances             []_Balance        `json:"balances"`
+		Balances             []Balance         `json:"balances"`
 		Data                 map[string]string `json:"data"`
 		NumSponsoring        uint32            `json:"num_sponsoring"`
 		NumSponsored         uint32            `json:"num_sponsored"`
 		Sponsor              string            `json:"sponsor,omitempty"`
 		PT                   string            `json:"paging_token"`
 	}
-	_FeeBumpTransaction struct {
+	FeeBumpTransaction struct {
 		Hash       string   `json:"hash"`
 		Signatures []string `json:"signatures"`
 	}
-	_InnerTransaction struct {
+	InnerTransaction struct {
 		Hash       string   `json:"hash"`
 		Signatures []string `json:"signatures"`
 		MaxFee     int64    `json:"max_fee,string"`
 	}
-	_TransactionRes struct {
-		_ErrorResponse
+	TransactionRes struct {
+		ErrorResponse
 		Links struct {
-			Self       _HalLink `json:"self"`
-			Account    _HalLink `json:"account"`
-			Ledger     _HalLink `json:"ledger"`
-			Operations _HalLink `json:"operations"`
-			Effects    _HalLink `json:"effects"`
-			Precedes   _HalLink `json:"precedes"`
-			Succeeds   _HalLink `json:"succeeds"`
+			Self       HalLink `json:"self"`
+			Account    HalLink `json:"account"`
+			Ledger     HalLink `json:"ledger"`
+			Operations HalLink `json:"operations"`
+			Effects    HalLink `json:"effects"`
+			Precedes   HalLink `json:"precedes"`
+			Succeeds   HalLink `json:"succeeds"`
 
-			Transaction _HalLink `json:"transaction"`
+			Transaction HalLink `json:"transaction"`
 		} `json:"_links"`
-		ID                 string               `json:"id"`
-		PT                 string               `json:"paging_token"`
-		Successful         bool                 `json:"successful"`
-		Hash               string               `json:"hash"`
-		Ledger             int32                `json:"ledger"`
-		LedgerCloseTime    time.Time            `json:"created_at"`
-		Account            string               `json:"source_account"`
-		AccountMuxed       string               `json:"account_muxed,omitempty"`
-		AccountMuxedID     uint64               `json:"account_muxed_id,omitempty,string"`
-		AccountSequence    string               `json:"source_account_sequence"`
-		FeeAccount         string               `json:"fee_account"`
-		FeeAccountMuxed    string               `json:"fee_account_muxed,omitempty"`
-		FeeAccountMuxedID  uint64               `json:"fee_account_muxed_id,omitempty,string"`
-		FeeCharged         int64                `json:"fee_charged,string"`
-		MaxFee             int64                `json:"max_fee,string"`
-		OperationCount     int32                `json:"operation_count"`
-		EnvelopeXdr        string               `json:"envelope_xdr"`
-		ResultXdr          string               `json:"result_xdr"`
-		ResultMetaXdr      string               `json:"result_meta_xdr"`
-		FeeMetaXdr         string               `json:"fee_meta_xdr"`
-		MemoType           string               `json:"memo_type"`
-		MemoBytes          string               `json:"memo_bytes,omitempty"`
-		Memo               string               `json:"memo,omitempty"`
-		Signatures         []string             `json:"signatures"`
-		ValidAfter         string               `json:"valid_after,omitempty"`
-		ValidBefore        string               `json:"valid_before,omitempty"`
-		FeeBumpTransaction *_FeeBumpTransaction `json:"fee_bump_transaction,omitempty"`
-		InnerTransaction   *_InnerTransaction   `json:"inner_transaction,omitempty"`
+		ID                 string              `json:"id"`
+		PT                 string              `json:"paging_token"`
+		Successful         bool                `json:"successful"`
+		Hash               string              `json:"hash"`
+		Ledger             int32               `json:"ledger"`
+		LedgerCloseTime    time.Time           `json:"created_at"`
+		Account            string              `json:"source_account"`
+		AccountMuxed       string              `json:"account_muxed,omitempty"`
+		AccountMuxedID     uint64              `json:"account_muxed_id,omitempty,string"`
+		AccountSequence    string              `json:"source_account_sequence"`
+		FeeAccount         string              `json:"fee_account"`
+		FeeAccountMuxed    string              `json:"fee_account_muxed,omitempty"`
+		FeeAccountMuxedID  uint64              `json:"fee_account_muxed_id,omitempty,string"`
+		FeeCharged         int64               `json:"fee_charged,string"`
+		MaxFee             int64               `json:"max_fee,string"`
+		OperationCount     int32               `json:"operation_count"`
+		EnvelopeXdr        string              `json:"envelope_xdr"`
+		ResultXdr          string              `json:"result_xdr"`
+		ResultMetaXdr      string              `json:"result_meta_xdr"`
+		FeeMetaXdr         string              `json:"fee_meta_xdr"`
+		MemoType           string              `json:"memo_type"`
+		MemoBytes          string              `json:"memo_bytes,omitempty"`
+		Memo               string              `json:"memo,omitempty"`
+		Signatures         []string            `json:"signatures"`
+		ValidAfter         string              `json:"valid_after,omitempty"`
+		ValidBefore        string              `json:"valid_before,omitempty"`
+		FeeBumpTransaction *FeeBumpTransaction `json:"fee_bump_transaction,omitempty"`
+		InnerTransaction   *InnerTransaction   `json:"inner_transaction,omitempty"`
 	}
-	_RpcOptionsRes struct {
-		_ErrorResponse
-		Links    _HalLink `json:"_links"`
+	RpcOptionsRes struct {
+		ErrorResponse
+		Links    HalLink `json:"_links"`
 		Embedded struct {
-			Records []_RpcOptions
+			Records []RpcOptions
 		} `json:"_embedded"`
 	}
-	_RpcOptions struct {
-		_ErrorResponse
-		Links    _HalLink `json:"_links"`
+	RpcOptions struct {
+		ErrorResponse
+		Links    HalLink `json:"_links"`
 		Embedded struct {
-			Records []_Ledger
+			Records []Ledger
 		} `json:"_embedded"`
 
-		_RpcBase
+		RpcBase
 		StartingBalance string `json:"starting_balance"`
 		Funder          string `json:"funder"`
 		Account         string `json:"account"`

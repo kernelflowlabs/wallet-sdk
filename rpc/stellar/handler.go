@@ -33,7 +33,7 @@ func NewHandler(rpcUrl string) (*Handler, error) {
 }
 
 func (h *Handler) GetHeight(ctx context.Context) (string, error) {
-	out := &_LedgersPageRes{}
+	out := &LedgersPageRes{}
 	params := url.Values{}
 	params.Set("limit", "1")
 	params.Set("order", "desc")
@@ -144,7 +144,7 @@ func (h *Handler) SendTx(ctx context.Context, signedHex string) (string, error) 
 	}
 	signedBase64 := base64.StdEncoding.EncodeToString(signedBytes)
 
-	res := &_TransactionRes{}
+	res := &TransactionRes{}
 	h.rpc.SetHeader("content-type", "application/x-www-form-urlencoded")
 	body := url.Values{}
 	body.Set("tx", signedBase64)
@@ -197,8 +197,8 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 	return "", fmt.Errorf("unsupported function")
 }
 
-func (h *Handler) getAccountInfo(ctx context.Context, address string) (*_AccountRes, error) {
-	res := &_AccountRes{}
+func (h *Handler) getAccountInfo(ctx context.Context, address string) (*AccountRes, error) {
+	res := &AccountRes{}
 	err := h.rpc.Get(ctx, res, "accounts/"+address, nil)
 	if err != nil {
 		return nil, err
@@ -211,8 +211,8 @@ func (h *Handler) getAccountInfo(ctx context.Context, address string) (*_Account
 	return res, nil
 }
 
-func (h *Handler) getTransactionById(ctx context.Context, txID string) (*_TransactionRes, error) {
-	res := &_TransactionRes{}
+func (h *Handler) getTransactionById(ctx context.Context, txID string) (*TransactionRes, error) {
+	res := &TransactionRes{}
 	err := h.rpc.Get(ctx, res, "transactions/"+txID, nil)
 	if err != nil {
 		return nil, err
@@ -222,8 +222,8 @@ func (h *Handler) getTransactionById(ctx context.Context, txID string) (*_Transa
 	return res, nil
 }
 
-func (h *Handler) getTransactionOptionsById(ctx context.Context, txID string) (*_RpcOptionsRes, error) {
-	res := &_RpcOptionsRes{}
+func (h *Handler) getTransactionOptionsById(ctx context.Context, txID string) (*RpcOptionsRes, error) {
+	res := &RpcOptionsRes{}
 	err := h.rpc.Get(ctx, res, "transactions/"+txID+"/operations", nil)
 	if err != nil {
 		return nil, err

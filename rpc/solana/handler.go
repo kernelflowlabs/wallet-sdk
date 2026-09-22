@@ -39,13 +39,13 @@ func NewHandler(rpcUrl, heliusAPIKey string) (*Handler, error) {
 }
 
 func (h *Handler) GetHeight(ctx context.Context) (string, error) {
-	req := &_BaseRequest{
+	req := &BaseRequest{
 		JsonRPC: "2.0",
 		ID:      0,
 		Method:  "getSlot",
 		Params:  nil,
 	}
-	res := &_GetSlotRes{}
+	res := &GetSlotRes{}
 	err := h.rpc.Post(ctx, res, "", req)
 	if err != nil {
 		return "", fmt.Errorf("failed to getSlot, err=%v", err)
@@ -57,13 +57,13 @@ func (h *Handler) GetHeight(ctx context.Context) (string, error) {
 }
 
 func (h *Handler) GetBlockHeight(ctx context.Context) (string, error) {
-	req := &_BaseRequest{
+	req := &BaseRequest{
 		JsonRPC: "2.0",
 		ID:      0,
 		Method:  "getBlockHeight",
 		Params:  nil,
 	}
-	res := &_GetBlockHeightRes{}
+	res := &GetBlockHeightRes{}
 	err := h.rpc.Post(ctx, res, "", req)
 	if err != nil {
 		return "", fmt.Errorf("failed to getBlockHeight, err=%v", err)
@@ -101,13 +101,13 @@ func (h *Handler) SendTx(ctx context.Context, signedHex string) (string, error) 
 	if err != nil {
 		return "", fmt.Errorf("failed to DecodeString, err=%v", err)
 	}
-	req := &_BaseRequest{
+	req := &BaseRequest{
 		JsonRPC: "2.0",
 		ID:      0,
 		Method:  "sendTransaction",
 		Params: []interface{}{
 			base64.StdEncoding.EncodeToString(tx),
-			_SendTransactionConfig{
+			SendTransactionConfig{
 				SkipPreflight:       false,
 				MaxRetries:          5,
 				PreflightCommitment: "processed",
@@ -115,7 +115,7 @@ func (h *Handler) SendTx(ctx context.Context, signedHex string) (string, error) 
 			},
 		},
 	}
-	res := &_SendTransactionRes{}
+	res := &SendTransactionRes{}
 	err = h.rpc.Post(ctx, res, "", req)
 	if err != nil {
 		return "", fmt.Errorf("failed to sendTransaction, err=%v", err)
@@ -131,20 +131,20 @@ func (h *Handler) SendTx(ctx context.Context, signedHex string) (string, error) 
 func (h *Handler) CheckTx(ctx context.Context, hash string) (*chainrpc.TxResult, error) {
 	r := &chainrpc.TxResult{}
 
-	req := &_BaseRequest{
+	req := &BaseRequest{
 		JsonRPC: "2.0",
 		ID:      0,
 		Method:  "getSignatureStatuses",
 		Params: []interface{}{[]string{
 			hash,
 		},
-			_SearchTransactionHistory{
+			SearchTransactionHistory{
 				SearchTransactionHistory: true,
 			},
 		},
 	}
 	var err error
-	res := &_GetSignatureStatusRes{}
+	res := &GetSignatureStatusRes{}
 	err = h.rpc.Post(ctx, res, "", req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to getSignatureStatuses, err=%v", err)
@@ -177,13 +177,13 @@ func (h *Handler) CheckTx(ctx context.Context, hash string) (*chainrpc.TxResult,
 }
 
 func (h *Handler) GetTxByHashWithLogs(ctx context.Context, hash string) (*GetTransactionWithLog, error) {
-	req := &_BaseRequest{
+	req := &BaseRequest{
 		JsonRPC: "2.0",
 		ID:      1,
 		Method:  "getTransaction",
 		Params: []interface{}{
 			hash,
-			_SearchTransaction{
+			SearchTransaction{
 				Commitment:                     "finalized",
 				MaxSupportedTransactionVersion: 0,
 			},
@@ -206,7 +206,7 @@ func (h *Handler) CallContract(ctx context.Context, contractAddress, params, blo
 func (h *Handler) InquireChain(ctx context.Context, instruction, params string) (string, error) {
 	switch instruction {
 	case "getAccountInfo":
-		req := &_BaseRequest{
+		req := &BaseRequest{
 			JsonRPC: "2.0",
 			ID:      0,
 			Method:  "getAccountInfo",
@@ -219,7 +219,7 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 				},
 			},
 		}
-		res := &_GetAccountInfoJsonRes{}
+		res := &GetAccountInfoJsonRes{}
 		err := h.rpc.Post(ctx, res, "", req)
 		if err != nil {
 			return "", fmt.Errorf("failed to getAccountInfo, err=%v", err)
@@ -232,13 +232,13 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 		}
 		return string(valueBytes), nil
 	case "getLatestBlockHash":
-		req := &_BaseRequest{
+		req := &BaseRequest{
 			JsonRPC: "2.0",
 			ID:      0,
 			Method:  "getLatestBlockhash",
 			Params:  nil,
 		}
-		res := &_GetLatestBlockhash{}
+		res := &GetLatestBlockhash{}
 		var lastErr error
 		for i := 0; i < 3; i++ {
 			err := h.rpc.Post(ctx, res, "", req)
@@ -275,7 +275,7 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 		}
 		legacyATAB58 := legacyATA.ToBase58()
 		ata2022B58 := ata2022.ToBase58()
-		req := &_BaseRequest{
+		req := &BaseRequest{
 			JsonRPC: "2.0",
 			ID:      0,
 			Method:  "getTokenAccountsByOwner",
@@ -293,7 +293,7 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 				},
 			},
 		}
-		res := &_GetTokenAccountsByOwnerResponse{}
+		res := &GetTokenAccountsByOwnerResponse{}
 		err = h.rpc.Post(ctx, res, "", req)
 		if err != nil {
 			return "", fmt.Errorf("failed to getTokenAccountsByOwner, err=%v", err)
@@ -336,13 +336,13 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 		}
 		return string(blockTxBytes), nil
 	case "isBlockHashValid":
-		req := &_BaseRequest{
+		req := &BaseRequest{
 			JsonRPC: "2.0",
 			ID:      0,
 			Method:  "isBlockhashValid",
 			Params:  []string{params},
 		}
-		res := &_IsBlockHashValidRes{}
+		res := &IsBlockHashValidRes{}
 		err := h.rpc.Post(ctx, res, "", req)
 		if err != nil {
 			return "", fmt.Errorf("failed to getFees, err=%v", err)
@@ -418,13 +418,13 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 		if err != nil {
 			return "", fmt.Errorf("failed to ParseUint for space, err=%v", err)
 		}
-		req := &_BaseRequest{
+		req := &BaseRequest{
 			JsonRPC: "2.0",
 			ID:      0,
 			Method:  "getMinimumBalanceForRentExemption",
 			Params:  []uint64{space},
 		}
-		res := &_GetminimumbalanceforrentexemptionRes{}
+		res := &GetminimumbalanceforrentexemptionRes{}
 		err = h.rpc.Post(ctx, res, "", req)
 		if err != nil {
 			return "", fmt.Errorf("failed to getMinimumBalanceForRentExemption, err=%v", err)
@@ -433,7 +433,7 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 		}
 		return strconv.FormatUint(res.Result, 10), nil
 	case "getNonceAccountBlockHash":
-		req := &_BaseRequest{
+		req := &BaseRequest{
 			JsonRPC: "2.0",
 			ID:      0,
 			Method:  "getAccountInfo",
@@ -446,7 +446,7 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 				},
 			},
 		}
-		res := &_GetAccountInfoJsonRes{}
+		res := &GetAccountInfoJsonRes{}
 		err := h.rpc.Post(ctx, res, "", req)
 		if err != nil {
 			return "", fmt.Errorf("failed to getAccountInfo, err=%v", err)
@@ -457,13 +457,13 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 		}
 		return res.Result.Value.Data.Parsed.Info.Blockhash, nil
 	case "getPriorityFee":
-		req := &_BaseRequest{
+		req := &BaseRequest{
 			JsonRPC: "2.0",
 			ID:      0,
 			Method:  "getRecentPrioritizationFees",
 			Params:  []interface{}{},
 		}
-		res := &_GetPrioritizationFee{}
+		res := &GetPrioritizationFee{}
 		err := h.rpc.Post(ctx, res, "", req)
 		if err != nil {
 			return "", fmt.Errorf("failed to getRecentPrioritizationFees, err=%v", err)
@@ -529,13 +529,13 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 
 // unexported
 func (h *Handler) getBaseCoinBalance(ctx context.Context, address string) (*big.Int, error) {
-	req := &_BaseRequest{
+	req := &BaseRequest{
 		JsonRPC: "2.0",
 		ID:      0,
 		Method:  "getBalance",
 		Params:  []string{address},
 	}
-	res := &_GetBalanceRes{}
+	res := &GetBalanceRes{}
 	if err := h.rpc.Post(ctx, res, "", req); err != nil {
 		return nil, fmt.Errorf("failed to getBalance, err=%v", err)
 	} else if res.Error.Code != 0 {
@@ -546,10 +546,9 @@ func (h *Handler) getBaseCoinBalance(ctx context.Context, address string) (*big.
 
 	return res.Result.Value, nil
 }
-// getTokenBalance sums every token account for owner+mint; the mint filter
-// matches legacy SPL and Token-2022 accounts alike, ATA or auxiliary.
+
 func (h *Handler) getTokenBalance(ctx context.Context, address, contractAddress string) (*big.Int, error) {
-	req := &_BaseRequest{
+	req := &BaseRequest{
 		JsonRPC: "2.0",
 		ID:      0,
 		Method:  "getTokenAccountsByOwner",
@@ -563,7 +562,7 @@ func (h *Handler) getTokenBalance(ctx context.Context, address, contractAddress 
 			}{"jsonParsed"},
 		},
 	}
-	res := &_GetTokenAccountsByOwnerResponse{}
+	res := &GetTokenAccountsByOwnerResponse{}
 	err := h.rpc.Post(ctx, res, "", req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to getTokenAccountsByOwner, err=%v", err)
@@ -585,8 +584,8 @@ func (h *Handler) getTokenBalance(ctx context.Context, address, contractAddress 
 	}
 	return total, nil
 }
-func (h *Handler) getBlockByNumber(ctx context.Context, num uint64) (*_GetBlockByNumberRes, error) {
-	req := &_BaseRequest{
+func (h *Handler) getBlockByNumber(ctx context.Context, num uint64) (*GetBlockByNumberRes, error) {
+	req := &BaseRequest{
 		JsonRPC: "2.0",
 		ID:      1,
 		Method:  "getBlock",
@@ -600,7 +599,7 @@ func (h *Handler) getBlockByNumber(ctx context.Context, num uint64) (*_GetBlockB
 			},
 		},
 	}
-	res := &_GetBlockByNumberRes{}
+	res := &GetBlockByNumberRes{}
 	err := h.rpc.Post(ctx, res, "", req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to getBlockByNumber, err=%v", err)
@@ -609,497 +608,3 @@ func (h *Handler) getBlockByNumber(ctx context.Context, num uint64) (*_GetBlockB
 	}
 	return res, nil
 }
-
-// types
-type (
-	_BaseRequest struct {
-		JsonRPC string      `json:"jsonrpc"`
-		ID      uint64      `json:"id"`
-		Method  string      `json:"method"`
-		Params  interface{} `json:"params"`
-	}
-	_BaseResponse struct {
-		JsonRPC string `json:"jsonrpc"`
-		ID      uint64 `json:"id"`
-		Error   struct {
-			Code    int    `json:"code"`
-			Message string `json:"message"`
-		}
-	}
-	_Context struct {
-		ApiVersion string `json:"apiVersion,omitempty"`
-		Slot       uint64 `json:"slot"`
-	}
-	_GetSlotRes struct {
-		_BaseResponse
-		Result uint64 `json:"result"`
-	}
-
-	_GetBlockHeightRes struct {
-		_BaseResponse
-		Result uint64 `json:"result"`
-	}
-
-	_GetBalanceRes struct {
-		_BaseResponse
-		Result struct {
-			Context *_Context `json:"context"`
-			Value   *big.Int  `json:"value"`
-		} `json:"result"`
-	}
-
-	AccountInfo struct {
-		Data struct {
-			Parsed struct {
-				Info struct {
-					Decimals        int    `json:"decimals"`
-					FreezeAuthority string `json:"freezeAuthority"`
-					IsInitialized   bool   `json:"isInitialized"`
-					MintAuthority   string `json:"mintAuthority"`
-					Supply          string `json:"supply"`
-
-					Authority     string `json:"authority"`
-					Blockhash     string `json:"blockhash"`
-					FeeCalculator struct {
-						LamportsPerSignature string `json:"lamportsPerSignature"`
-					} `json:"feeCalculator"`
-				} `json:"info"`
-				Type string `json:"type"`
-			} `json:"parsed"`
-			Program string `json:"program"`
-			Space   int    `json:"space"`
-		} `json:"data,omitempty"`
-		//Data1      []string `json:"data,omitempty"`
-		Executable bool   `json:"executable"`
-		Lamports   uint64 `json:"lamports"`
-	}
-
-	_GetAccountInfoJsonRes struct {
-		_BaseResponse
-		Result struct {
-			Context *_Context   `json:"context"`
-			Value   AccountInfo `json:"value"`
-		} `json:"result"`
-	}
-
-	_GetTokenBalanceRes struct {
-		_BaseResponse
-		Result struct {
-			Context *_Context `json:"context"`
-			Value   struct {
-				Amount   string  `json:"amount"`
-				Decimals int     `json:"decimals"`
-				UiAmount float64 `json:"uiAmount"`
-			} `json:"value"`
-		} `json:"result"`
-	}
-
-	_GetLatestBlockhash struct {
-		_BaseResponse
-		Result struct {
-			Context struct {
-				Slot int `json:"slot"`
-			} `json:"context"`
-			Value struct {
-				Blockhash            string `json:"blockhash"`
-				LastValidBlockHeight int    `json:"lastValidBlockHeight"`
-			} `json:"value"`
-		} `json:"result"`
-	}
-	_IsBlockHashValidRes struct {
-		_BaseResponse
-		Result struct {
-			Context *_Context `json:"context"`
-			Value   bool      `json:"value"`
-		} `json:"result"`
-	}
-
-	_GetminimumbalanceforrentexemptionRes struct {
-		_BaseResponse
-		Result uint64 `json:"result"`
-	}
-
-	_SendTransactionRes struct {
-		_BaseResponse
-		Result string `json:"result"`
-	}
-
-	_GetSignatureStatus struct {
-		Slot               uint64      `json:"slot"`
-		Confirmations      uint64      `json:"confirmations"`
-		Err                interface{} `json:"err"`
-		ConfirmationStatus string      `json:"confirmationStatus"` //finalized, confirmed, processed
-	}
-	_GetSignatureStatusRes struct {
-		_BaseResponse
-		Result struct {
-			Context *_Context              `json:"context"`
-			Value   []*_GetSignatureStatus `json:"value"`
-		} `json:"result"`
-	}
-	_GetTokenAccountsByOwnerResponse struct {
-		_BaseResponse
-		Result struct {
-			Context *_Context                   `json:"context"`
-			Value   []*_GetTokenAccountsByOwner `json:"value"`
-		} `json:"result"`
-	}
-	_GetTokenAccountsByOwner struct {
-		Pubkey  string `json:"pubkey"`
-		Account struct {
-			Data struct {
-				Parsed struct {
-					Info struct {
-						IsNative    bool   `json:"isNative"`
-						Mint        string `json:"mint"`
-						Owner       string `json:"owner"`
-						State       string `json:"state"`
-						TokenAmount struct {
-							Amount   string  `json:"amount"`
-							Decimals int     `json:"decimals"`
-							UiAmount float64 `json:"uiAmount"`
-						} `json:"tokenAmount"`
-					} `json:"info"`
-					Type string `json:"type"`
-				} `json:"parsed"`
-				Program string `json:"program"`
-				Space   uint64 `json:"space"`
-			} `json:"data"`
-			Executable bool   `json:"executable"`
-			Lamports   uint64 `json:"lamports"`
-			Owner      string `json:"owner"`
-			RentEpoch  uint64 `json:"rentEpoch"`
-		} `json:"account"`
-	}
-	GetTransaction struct {
-		_BaseResponse
-		Result struct {
-			BlockTime int `json:"blockTime"`
-			Meta      struct {
-				ComputeUnitsConsumed int           `json:"computeUnitsConsumed"`
-				Err                  interface{}   `json:"err"`
-				Fee                  int           `json:"fee"`
-				InnerInstructions    []interface{} `json:"innerInstructions"`
-				LogMessages          []string      `json:"logMessages"`
-				PostBalances         []int         `json:"postBalances"`
-				PostTokenBalances    []struct {
-					AccountIndex  int    `json:"accountIndex"`
-					Mint          string `json:"mint"`
-					Owner         string `json:"owner"`
-					ProgramID     string `json:"programId"`
-					UITokenAmount struct {
-						Amount         string  `json:"amount"`
-						Decimals       int     `json:"decimals"`
-						UIAmount       float64 `json:"uiAmount"`
-						UIAmountString string  `json:"uiAmountString"`
-					} `json:"uiTokenAmount"`
-				} `json:"postTokenBalances"`
-				PreBalances      []int `json:"preBalances"`
-				PreTokenBalances []struct {
-					AccountIndex  int    `json:"accountIndex"`
-					Mint          string `json:"mint"`
-					Owner         string `json:"owner"`
-					ProgramID     string `json:"programId"`
-					UITokenAmount struct {
-						Amount         string  `json:"amount"`
-						Decimals       int     `json:"decimals"`
-						UIAmount       float64 `json:"uiAmount"`
-						UIAmountString string  `json:"uiAmountString"`
-					} `json:"uiTokenAmount"`
-				} `json:"preTokenBalances"`
-				Rewards []interface{} `json:"rewards"`
-				Status  struct {
-					Ok interface{} `json:"Ok"`
-				} `json:"status"`
-			} `json:"meta"`
-			Slot        int `json:"slot"`
-			Transaction struct {
-				Message struct {
-					AccountKeys []struct {
-						Pubkey   string `json:"pubkey"`
-						Signer   bool   `json:"signer"`
-						Source   string `json:"source"`
-						Writable bool   `json:"writable"`
-					} `json:"accountKeys"`
-					//AccountKeys  []string `json:"accountKeys"`
-					Instructions []struct {
-						Accounts    []interface{}   `json:"accounts,omitempty"`
-						Data        string          `json:"data,omitempty"`
-						ProgramID   string          `json:"programId"`
-						StackHeight interface{}     `json:"stackHeight"`
-						Parsed      json.RawMessage `json:"parsed"`
-						Program string `json:"program,omitempty"`
-					} `json:"instructions"`
-					RecentBlockhash string `json:"recentBlockhash"`
-				} `json:"message"`
-				Signatures []string `json:"signatures"`
-			} `json:"transaction"`
-		} `json:"result"`
-		ID int `json:"id"`
-	}
-	GetTransactionWithLog struct {
-		_BaseResponse
-		Result struct {
-			BlockTime int `json:"blockTime"`
-			Meta      struct {
-				ComputeUnitsConsumed int           `json:"computeUnitsConsumed"`
-				Err                  interface{}   `json:"err"`
-				Fee                  int           `json:"fee"`
-				InnerInstructions    []interface{} `json:"innerInstructions"`
-				LogMessages          []string      `json:"logMessages"`
-				PostBalances         []int         `json:"postBalances"`
-				PostTokenBalances    []struct {
-					AccountIndex  int    `json:"accountIndex"`
-					Mint          string `json:"mint"`
-					Owner         string `json:"owner"`
-					ProgramID     string `json:"programId"`
-					UITokenAmount struct {
-						Amount         string  `json:"amount"`
-						Decimals       int     `json:"decimals"`
-						UIAmount       float64 `json:"uiAmount"`
-						UIAmountString string  `json:"uiAmountString"`
-					} `json:"uiTokenAmount"`
-				} `json:"postTokenBalances"`
-				PreBalances      []int `json:"preBalances"`
-				PreTokenBalances []struct {
-					AccountIndex  int    `json:"accountIndex"`
-					Mint          string `json:"mint"`
-					Owner         string `json:"owner"`
-					ProgramID     string `json:"programId"`
-					UITokenAmount struct {
-						Amount         string  `json:"amount"`
-						Decimals       int     `json:"decimals"`
-						UIAmount       float64 `json:"uiAmount"`
-						UIAmountString string  `json:"uiAmountString"`
-					} `json:"uiTokenAmount"`
-				} `json:"preTokenBalances"`
-				Rewards []interface{} `json:"rewards"`
-				Status  struct {
-					Ok interface{} `json:"Ok"`
-				} `json:"status"`
-			} `json:"meta"`
-			Slot        int `json:"slot"`
-			Transaction struct {
-				Message struct {
-					AccountKeys  []string `json:"accountKeys"`
-					Instructions []struct {
-						Accounts    []interface{}   `json:"accounts,omitempty"`
-						Data        string          `json:"data,omitempty"`
-						ProgramID   string          `json:"programId"`
-						StackHeight interface{}     `json:"stackHeight"`
-						Parsed      json.RawMessage `json:"parsed"`
-						Program string `json:"program,omitempty"`
-					} `json:"instructions"`
-					RecentBlockhash string `json:"recentBlockhash"`
-				} `json:"message"`
-				Signatures []string `json:"signatures"`
-			} `json:"transaction"`
-		} `json:"result"`
-		ID int `json:"id"`
-	}
-	_GetPrioritizationFee struct {
-		_BaseResponse
-		Result []PrioritizationFeeItem `json:"result"`
-	}
-	PrioritizationFeeItem struct {
-		Slot              uint64 `json:"slot"`
-		PrioritizationFee uint64 `json:"prioritizationFee"`
-	}
-
-	TransferInfo struct {
-		Info struct {
-			Amount            string `json:"amount"`
-			Lamports          int    `json:"lamports"`
-			Authority         string `json:"authority"`
-			MultisigAuthority string `json:"multisigAuthority"`
-			Destination       string `json:"destination"`
-			Source            string `json:"source"`
-		} `json:"info"`
-		Type string `json:"type"`
-	}
-
-	_GetBlockByNumberRes struct {
-		_BaseResponse
-		Result struct {
-			BlockHeight       int64   `json:"blockHeight"`
-			BlockTime         int64   `json:"blockTime"`
-			Blockhash         string  `json:"blockhash"`
-			ParentSlot        int64   `json:"parentSlot"`
-			PreviousBlockhash string  `json:"previousBlockhash"`
-			Transactions      []RpcTx `json:"transactions"`
-		} `json:"result"`
-		ID int `json:"id"`
-	}
-
-	SPLTokenTransfer struct {
-		AccountIndex  int    `json:"accountIndex"`
-		Mint          string `json:"mint"`
-		Owner         string `json:"owner"`
-		UiTokenAmount struct {
-			Amount         string  `json:"amount"`
-			Decimals       int     `json:"decimals"`
-			UiAmount       float64 `json:"uiAmount"`
-			UiAmountString string  `json:"uiAmountString"`
-		} `json:"uiTokenAmount"`
-	}
-	RpcTx struct {
-		Meta struct {
-			ComputeUnitsConsumed int           `json:"computeUnitsConsumed"`
-			Err                  interface{}   `json:"err"`
-			Fee                  int           `json:"fee"`
-			InnerInstructions    []interface{} `json:"innerInstructions"`
-			LoadedAddresses      struct {
-				Readonly []interface{} `json:"readonly"`
-				Writable []interface{} `json:"writable"`
-			} `json:"loadedAddresses"`
-			LogMessages       []string            `json:"logMessages"`
-			PreBalances       []uint64            `json:"preBalances"`
-			PostBalances      []uint64            `json:"postBalances"`
-			PreTokenBalances  []*SPLTokenTransfer `json:"preTokenBalances"`
-			PostTokenBalances []*SPLTokenTransfer `json:"postTokenBalances"`
-			Rewards           interface{}         `json:"rewards"`
-			Status            struct {
-				Ok interface{} `json:"Ok"`
-			} `json:"status"`
-		} `json:"meta"`
-		Transaction struct {
-			Message struct {
-				AccountKeys []string `json:"accountKeys"`
-				Header struct {
-					NumReadonlySignedAccounts   int `json:"numReadonlySignedAccounts"`
-					NumReadonlyUnsignedAccounts int `json:"numReadonlyUnsignedAccounts"`
-					NumRequiredSignatures       int `json:"numRequiredSignatures"`
-				} `json:"header"`
-				Instructions []struct {
-					Accounts       []int       `json:"accounts"`
-					Data           string      `json:"data"`
-					ProgramIDIndex int         `json:"programIdIndex"`
-					StackHeight    interface{} `json:"stackHeight"`
-				} `json:"instructions"`
-				RecentBlockhash string `json:"recentBlockhash"`
-			} `json:"message"`
-			Signatures []string `json:"signatures"`
-		} `json:"transaction"`
-		Version interface{} `json:"version"`
-	}
-	RpcBlock struct {
-		BlockTime    int64   `json:"blockTime"`
-		Transactions []RpcTx `json:"transactions"`
-	}
-)
-
-type (
-	_SendTransactionConfig struct {
-		SkipPreflight       bool   `json:"skipPreflight"` // default: false
-		MaxRetries          int64  `json:"maxRetries"`
-		PreflightCommitment string `json:"preflightCommitment"` // default: max
-		Encoding            string `json:"encoding"`            // base58 or base64
-	}
-	_SearchTransactionHistory struct {
-		SearchTransactionHistory bool `json:"searchTransactionHistory"`
-	}
-	_SearchTransaction struct {
-		Commitment                     string `json:"commitment"`
-		MaxSupportedTransactionVersion int64  `json:"maxSupportedTransactionVersion"`
-	}
-)
-
-type (
-	HeliusTokenMetaReq struct {
-		MintAccounts []string `json:"mintAccounts"`
-	}
-	HeliusTokenMetaResItem struct {
-		Account            string `json:"account"`
-		OnChainAccountInfo struct {
-			AccountInfo struct {
-				Key        string `json:"key"`
-				IsSigner   bool   `json:"isSigner"`
-				IsWritable bool   `json:"isWritable"`
-				Lamports   int64  `json:"lamports"`
-				Data       struct {
-					Parsed struct {
-						Info struct {
-							Decimals        int    `json:"decimals"`
-							FreezeAuthority string `json:"freezeAuthority"`
-							IsInitialized   bool   `json:"isInitialized"`
-							MintAuthority   string `json:"mintAuthority"`
-							Supply          string `json:"supply"`
-						} `json:"info"`
-						Type string `json:"type"`
-					} `json:"parsed"`
-					Program string `json:"program"`
-					Space   int    `json:"space"`
-				} `json:"data"`
-				Owner      string  `json:"owner"`
-				Executable bool    `json:"executable"`
-				RentEpoch  float64 `json:"rentEpoch"`
-			} `json:"accountInfo"`
-			Error string `json:"error"`
-		} `json:"onChainAccountInfo"`
-		OnChainMetadata struct {
-			Metadata struct {
-				TokenStandard   string `json:"tokenStandard"`
-				Key             string `json:"key"`
-				UpdateAuthority string `json:"updateAuthority"`
-				Mint            string `json:"mint"`
-				Data            struct {
-					Name                 string      `json:"name"`
-					Symbol               string      `json:"symbol"`
-					Uri                  string      `json:"uri"`
-					SellerFeeBasisPoints int         `json:"sellerFeeBasisPoints"`
-					Creators             interface{} `json:"creators"`
-				} `json:"data"`
-				PrimarySaleHappened bool `json:"primarySaleHappened"`
-				IsMutable           bool `json:"isMutable"`
-				EditionNonce        int  `json:"editionNonce"`
-				Uses                struct {
-					UseMethod string `json:"useMethod"`
-					Remaining int    `json:"remaining"`
-					Total     int    `json:"total"`
-				} `json:"uses"`
-				Collection        interface{} `json:"collection"`
-				CollectionDetails interface{} `json:"collectionDetails"`
-			} `json:"metadata"`
-			Error string `json:"error"`
-		} `json:"onChainMetadata"`
-		LegacyMetadata struct {
-			ChainId    int      `json:"chainId"`
-			Address    string   `json:"address"`
-			Symbol     string   `json:"symbol"`
-			Name       string   `json:"name"`
-			Decimals   int      `json:"decimals"`
-			LogoURI    string   `json:"logoURI"`
-			Tags       []string `json:"tags"`
-			Extensions struct {
-				CoingeckoId string `json:"coingeckoId"`
-				SerumV3Usdc string `json:"serumV3Usdc"`
-				Website     string `json:"website"`
-			} `json:"extensions"`
-		} `json:"legacyMetadata"`
-	}
-	HeliusTokenMetaMainReq struct {
-		Jsonrpc string `json:"jsonrpc"`
-		Id      string `json:"id"`
-		Method  string `json:"method"`
-		Params  struct {
-			Id             string `json:"id"`
-			DisplayOptions struct {
-				ShowFungible bool `json:"showFungible"`
-			} `json:"displayOptions"`
-		} `json:"params"`
-	}
-	HeliusTokenMetaMainRes struct {
-		Jsonrpc string `json:"jsonrpc"`
-		Result  struct {
-			Content struct {
-				Metadata struct {
-					Name   string `json:"name"`
-					Symbol string `json:"symbol"`
-				} `json:"metadata"`
-			} `json:"content"`
-			TokenInfo struct {
-				Decimals int64 `json:"decimals"`
-			} `json:"token_info"`
-		} `json:"result"`
-	}
-)

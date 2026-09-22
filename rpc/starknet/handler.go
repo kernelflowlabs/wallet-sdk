@@ -18,8 +18,6 @@ import (
 
 var _ chainrpc.BasicChainHandler = (*Handler)(nil)
 
-const ethContractAddress = "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7"
-
 type Handler struct {
 	rpc *httpc.Request
 }
@@ -39,8 +37,8 @@ func expandAddress(address string) string {
 }
 
 func (h *Handler) GetHeight(ctx context.Context) (string, error) {
-	req := &_BaseRequest{JsonRPC: "2.0", ID: "0", Method: "starknet_blockNumber"}
-	res := &_GetHeightRes{}
+	req := &BaseRequest{JsonRPC: "2.0", ID: "0", Method: "starknet_blockNumber"}
+	res := &GetHeightRes{}
 	if err := h.rpc.Post(ctx, res, "", req); err != nil {
 		return "", fmt.Errorf("fail to GetHeight, err=%v", err)
 	} else if res.Error != nil {
@@ -53,7 +51,7 @@ func (h *Handler) GetBalance(ctx context.Context, address, contractAddress, bloc
 	if contractAddress == signing.MagicContactAddressForNative {
 		contractAddress = ethContractAddress
 	}
-	req := &_BaseRequest{JsonRPC: "2.0", ID: "0", Method: "starknet_call",
+	req := &BaseRequest{JsonRPC: "2.0", ID: "0", Method: "starknet_call",
 		Params: []interface{}{
 			map[string]interface{}{
 				"calldata":             []string{address},
@@ -62,7 +60,7 @@ func (h *Handler) GetBalance(ctx context.Context, address, contractAddress, bloc
 			},
 			"latest",
 		}}
-	res := &_GetBalanceRes{}
+	res := &GetBalanceRes{}
 	if err := h.rpc.Post(ctx, res, "", req); err != nil {
 		return "", fmt.Errorf("fail to GetBalance, err=%v", err)
 	} else if res.Error != nil {
@@ -90,9 +88,9 @@ func (h *Handler) GetTransfersByHash(ctx context.Context, hash string, confirmat
 		return r, nil
 	}
 
-	req := &_BaseRequest{JsonRPC: "2.0", ID: "0", Method: "starknet_getTransactionByHash",
+	req := &BaseRequest{JsonRPC: "2.0", ID: "0", Method: "starknet_getTransactionByHash",
 		Params: []string{hash}}
-	res := &_GetTransactionByHash{}
+	res := &GetTransactionByHash{}
 	if err := h.rpc.Post(ctx, res, "", req); err != nil {
 		return nil, fmt.Errorf("fail to getTransactionByHash, err=%v", err)
 	} else if res.Error != nil {
@@ -121,9 +119,9 @@ func (h *Handler) SendTx(ctx context.Context, signedHex string) (string, error) 
 		return "", fmt.Errorf("SendTx DecodeString, err=%v", err)
 	}
 	var txn json.RawMessage = signedBytes
-	req := &_BaseRequest{JsonRPC: "2.0", ID: "0", Method: "starknet_addInvokeTransaction",
+	req := &BaseRequest{JsonRPC: "2.0", ID: "0", Method: "starknet_addInvokeTransaction",
 		Params: map[string]interface{}{"invoke_transaction": txn}}
-	res := &_SendTxRes{}
+	res := &SendTxRes{}
 	if err := h.rpc.Post(ctx, res, "", req); err != nil {
 		return "", fmt.Errorf("fail to SendTx, err=%v", err)
 	} else if res.Error != nil {
@@ -134,9 +132,9 @@ func (h *Handler) SendTx(ctx context.Context, signedHex string) (string, error) 
 
 func (h *Handler) CheckTx(ctx context.Context, hash string) (*chainrpc.TxResult, error) {
 	result := &chainrpc.TxResult{}
-	req := &_BaseRequest{JsonRPC: "2.0", ID: "0", Method: "starknet_getTransactionReceipt",
+	req := &BaseRequest{JsonRPC: "2.0", ID: "0", Method: "starknet_getTransactionReceipt",
 		Params: []string{hash}}
-	res := &_GetTransaction{}
+	res := &GetTransaction{}
 	if err := h.rpc.Post(ctx, res, "", req); err != nil {
 		return nil, fmt.Errorf("fail to CheckTx, err=%v", err)
 	} else if res.Error != nil {
@@ -168,9 +166,9 @@ func (h *Handler) CallContract(ctx context.Context, contractAddress, params, blo
 func (h *Handler) InquireChain(ctx context.Context, instruction, params string) (string, error) {
 	switch instruction {
 	case "getNonce":
-		req := &_BaseRequest{JsonRPC: "2.0", ID: "0", Method: "starknet_getNonce",
+		req := &BaseRequest{JsonRPC: "2.0", ID: "0", Method: "starknet_getNonce",
 			Params: []string{"latest", params}}
-		res := &_GetNonceRes{}
+		res := &GetNonceRes{}
 		if err := h.rpc.Post(ctx, res, "", req); err != nil {
 			return "", fmt.Errorf("fail to GetNonce, err=%v", err)
 		} else if res.Error != nil {
@@ -184,7 +182,7 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 		}
 		return hexToBig(res.Result).String(), nil
 	case "getContractDecimals":
-		req := &_BaseRequest{JsonRPC: "2.0", ID: "0", Method: "starknet_call",
+		req := &BaseRequest{JsonRPC: "2.0", ID: "0", Method: "starknet_call",
 			Params: []interface{}{
 				map[string]interface{}{
 					"calldata":             []string{},
@@ -193,7 +191,7 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 				},
 				"latest",
 			}}
-		res := &_GetDecimalRes{}
+		res := &GetDecimalRes{}
 		if err := h.rpc.Post(ctx, res, "", req); err != nil {
 			return "", fmt.Errorf("fail to GetDecimal, err=%v", err)
 		} else if res.Error != nil {
@@ -207,9 +205,9 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 			return "", fmt.Errorf("estimateFee: bad params, err=%v", err)
 		}
 		txn := json.RawMessage(txBytes)
-		req := &_BaseRequest{JsonRPC: "2.0", ID: "0", Method: "starknet_estimateFee",
+		req := &BaseRequest{JsonRPC: "2.0", ID: "0", Method: "starknet_estimateFee",
 			Params: []interface{}{[]json.RawMessage{txn}, []interface{}{}, "pending"}}
-		res := &_EstimateFeeRes{}
+		res := &EstimateFeeRes{}
 		if err := h.rpc.Post(ctx, res, "", req); err != nil {
 			return "", fmt.Errorf("fail to estimateFee, err=%v", err)
 		} else if res.Error != nil {

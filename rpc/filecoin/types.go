@@ -1,13 +1,13 @@
 package filecoin
 
-type _BaseRequest struct {
+type BaseRequest struct {
 	JsonRPC string      `json:"jsonrpc"`
 	ID      uint64      `json:"id"`
 	Method  string      `json:"method"`
 	Params  interface{} `json:"params,omitempty"`
 }
 
-type _BaseResponse struct {
+type BaseResponse struct {
 	JsonRPC string `json:"jsonrpc"`
 	ID      uint64 `json:"id"`
 	Error   struct {
@@ -16,7 +16,7 @@ type _BaseResponse struct {
 	}
 }
 
-type _Message struct {
+type Message struct {
 	Version    uint64 `json:"Version"`
 	To         string `json:"To"`
 	From       string `json:"From"`
@@ -29,8 +29,8 @@ type _Message struct {
 	Params     []byte `json:"Params"`
 }
 
-type _SignedMessage struct {
-	Message   *_Message `json:"Message"`
+type SignedMessage struct {
+	Message   *Message `json:"Message"`
 	Signature struct {
 		Type byte   `json:"Type"`
 		Data []byte `json:"Data"`
@@ -38,50 +38,50 @@ type _SignedMessage struct {
 }
 
 type (
-	_GetBlockHeight struct {
+	GetBlockHeight struct {
 		Height uint64
 	}
-	_GetBlockHeightRes struct {
-		_BaseResponse
-		Result *_GetBlockHeight `json:"result"`
+	GetBlockHeightRes struct {
+		BaseResponse
+		Result *GetBlockHeight `json:"result"`
 	}
-	_GetBalanceResponse struct {
-		_BaseResponse
+	GetBalanceResponse struct {
+		BaseResponse
 		Result string `json:"result"`
 	}
-	_GetTipSetByHeight struct {
+	GetTipSetByHeight struct {
 		Blocks []struct {
 			Timestamp int64 `json:"Timestamp"`
 		}
 		Height uint64 `json:"Height"`
 	}
-	_GetTipSetByHeightRes struct {
-		_BaseResponse
-		Result *_GetTipSetByHeight `json:"result"`
+	GetTipSetByHeightRes struct {
+		BaseResponse
+		Result *GetTipSetByHeight `json:"result"`
 	}
-	_GetMessageResponse struct {
-		_BaseResponse
-		Result *_Message `json:"result"`
+	GetMessageResponse struct {
+		BaseResponse
+		Result *Message `json:"result"`
 	}
-	_GetMpoolGetNonceRes struct {
-		_BaseResponse
+	GetMpoolGetNonceRes struct {
+		BaseResponse
 		Result uint64 `json:"result"`
 	}
-	_MpoolPushResponse struct {
-		_BaseResponse
+	MpoolPushResponse struct {
+		BaseResponse
 		Result struct {
 			Cid string `json:"/"`
 		} `json:"result"`
 	}
-	_GasEstimateRes struct {
-		_BaseResponse
+	GasEstimateRes struct {
+		BaseResponse
 		Result struct {
 			GasLimit   int64  `json:"GasLimit"`
 			GasFeeCap  string `json:"GasFeeCap"`
 			GasPremium string `json:"GasPremium"`
 		} `json:"result"`
 	}
-	_StateSearchMsgLimited struct {
+	StateSearchMsgLimited struct {
 		Receipt struct {
 			ExitCode int64
 			Return   string
@@ -89,8 +89,8 @@ type (
 		}
 		Height uint64
 	}
-	_StateSearchMsgLimitedRes struct {
-		_BaseResponse
-		Result *_StateSearchMsgLimited `json:"result"`
+	StateSearchMsgLimitedRes struct {
+		BaseResponse
+		Result *StateSearchMsgLimited `json:"result"`
 	}
 )

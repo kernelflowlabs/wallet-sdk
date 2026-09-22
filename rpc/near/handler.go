@@ -32,9 +32,9 @@ func NewHandler(rpcUrl string) (*Handler, error) {
 }
 
 func (h *Handler) GetHeight(ctx context.Context) (string, error) {
-	req := &_BaseRequest{JsonRPC: "2.0", ID: "dontcare", Method: "block",
+	req := &BaseRequest{JsonRPC: "2.0", ID: "dontcare", Method: "block",
 		Params: map[string]interface{}{"finality": "final"}}
-	res := &_GetBlockRes{}
+	res := &GetBlockRes{}
 	err := h.rpc.Post(ctx, res, "", req)
 	if err != nil {
 		return "", fmt.Errorf("fail to get latest block, err=%v", err)
@@ -153,9 +153,9 @@ func (h *Handler) SendTx(ctx context.Context, signedHex string) (string, error) 
 		return "", fmt.Errorf("fail to DecodeString for signedHex, err=%v", err)
 	}
 	rawBase64 := base64.StdEncoding.EncodeToString(signedBytes)
-	req := &_BaseRequest{JsonRPC: "2.0", ID: "dontcare", Method: "broadcast_tx_commit",
+	req := &BaseRequest{JsonRPC: "2.0", ID: "dontcare", Method: "broadcast_tx_commit",
 		Params: []string{rawBase64}}
-	res := &_ReceiptRes{}
+	res := &ReceiptRes{}
 	err = h.rpc.Post(ctx, res, "", req)
 	if err != nil {
 		return "", fmt.Errorf("fail to send tx, err=%v", err)
@@ -222,14 +222,14 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 			return "", fmt.Errorf("fail DecodeString, err=%v", err)
 		}
 		b58PubKey := "ed25519:" + base58.Encode(publicKeyBytes)
-		req := &_BaseRequest{JsonRPC: "2.0", ID: "dontcare", Method: "query",
+		req := &BaseRequest{JsonRPC: "2.0", ID: "dontcare", Method: "query",
 			Params: map[string]interface{}{
 				"request_type": "view_access_key",
 				"account_id":   accountId,
 				"public_key":   b58PubKey,
 				"finality":     "final",
 			}}
-		res := &_GetNonceRes{}
+		res := &GetNonceRes{}
 		err = h.rpc.Post(ctx, res, "", req)
 		if err != nil {
 			return "", fmt.Errorf("fail to get nonce, err=%v", err)
@@ -240,9 +240,9 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 		}
 		return strconv.FormatUint(res.Result.Nonce+1, 10), nil
 	case "getRefBlockHash":
-		req := &_BaseRequest{JsonRPC: "2.0", ID: "dontcare", Method: "block",
+		req := &BaseRequest{JsonRPC: "2.0", ID: "dontcare", Method: "block",
 			Params: map[string]interface{}{"finality": "final"}}
-		res := &_GetBlockRes{}
+		res := &GetBlockRes{}
 		err := h.rpc.Post(ctx, res, "", req)
 		if err != nil {
 			return "", fmt.Errorf("fail to getRefBlockHash, err=%v", err)
@@ -274,13 +274,13 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 }
 
 func (h *Handler) getBaseCoinBalance(ctx context.Context, address string) (*big.Int, error) {
-	req := &_BaseRequest{JsonRPC: "2.0", ID: "dontcare", Method: "query",
+	req := &BaseRequest{JsonRPC: "2.0", ID: "dontcare", Method: "query",
 		Params: map[string]interface{}{
 			"finality":     "final",
 			"request_type": "view_account",
 			"account_id":   address,
 		}}
-	res := &_GetBalanceRes{}
+	res := &GetBalanceRes{}
 	err := h.rpc.Post(ctx, res, "", req)
 	if err != nil {
 		return nil, err
@@ -299,7 +299,7 @@ func (h *Handler) getTokenBalance(ctx context.Context, address, contract string)
 	if err != nil {
 		return "", fmt.Errorf("fail to Marshal address, err=%v", err)
 	}
-	req := &_BaseRequest{JsonRPC: "2.0", ID: "dontcare", Method: "query",
+	req := &BaseRequest{JsonRPC: "2.0", ID: "dontcare", Method: "query",
 		Params: map[string]interface{}{
 			"request_type": "call_function",
 			"finality":     "final",
@@ -307,7 +307,7 @@ func (h *Handler) getTokenBalance(ctx context.Context, address, contract string)
 			"method_name":  "ft_balance_of",
 			"args_base64":  base64.StdEncoding.EncodeToString(contractParam),
 		}}
-	res := &_ContractTokenRes{}
+	res := &ContractTokenRes{}
 	err = h.rpc.Post(ctx, res, "", req)
 	if err != nil {
 		return "", fmt.Errorf("fail to call_function for ft_balance_of, err=%v", err)
@@ -317,9 +317,9 @@ func (h *Handler) getTokenBalance(ctx context.Context, address, contract string)
 	return strings.TrimPrefix(strings.TrimSuffix(string(res.Result.Result), `"`), `"`), nil
 }
 
-func (h *Handler) getTransactionReceipt(ctx context.Context, hash, address string) (*_TransactionReceipt, error) {
-	req := &_BaseRequest{JsonRPC: "2.0", ID: "dontcare", Method: "tx", Params: []string{hash, address}}
-	res := &_ReceiptRes{}
+func (h *Handler) getTransactionReceipt(ctx context.Context, hash, address string) (*TransactionReceipt, error) {
+	req := &BaseRequest{JsonRPC: "2.0", ID: "dontcare", Method: "tx", Params: []string{hash, address}}
+	res := &ReceiptRes{}
 	err := h.rpc.Post(ctx, res, "", req)
 	if err != nil {
 		return nil, err
@@ -329,10 +329,10 @@ func (h *Handler) getTransactionReceipt(ctx context.Context, hash, address strin
 	return &res.Result, nil
 }
 
-func (h *Handler) getBlockByHash(ctx context.Context, blockHash string) (*_Block, error) {
-	req := &_BaseRequest{JsonRPC: "2.0", ID: "dontcare", Method: "block",
+func (h *Handler) getBlockByHash(ctx context.Context, blockHash string) (*Block, error) {
+	req := &BaseRequest{JsonRPC: "2.0", ID: "dontcare", Method: "block",
 		Params: map[string]interface{}{"block_id": blockHash}}
-	res := &_GetBlockRes{}
+	res := &GetBlockRes{}
 	err := h.rpc.Post(ctx, res, "", req)
 	if err != nil {
 		return nil, err
@@ -342,9 +342,9 @@ func (h *Handler) getBlockByHash(ctx context.Context, blockHash string) (*_Block
 	return &res.Result, nil
 }
 
-func (h *Handler) getStorageBalance(ctx context.Context, account, contract string) (*_TokenStorageBalance, error) {
+func (h *Handler) getStorageBalance(ctx context.Context, account, contract string) (*TokenStorageBalance, error) {
 	contractParam, _ := json.Marshal(map[string]interface{}{"account_id": account})
-	req := &_BaseRequest{JsonRPC: "2.0", ID: "dontcare", Method: "query",
+	req := &BaseRequest{JsonRPC: "2.0", ID: "dontcare", Method: "query",
 		Params: map[string]interface{}{
 			"request_type": "call_function",
 			"finality":     "final",
@@ -352,22 +352,22 @@ func (h *Handler) getStorageBalance(ctx context.Context, account, contract strin
 			"method_name":  "storage_balance_of",
 			"args_base64":  base64.StdEncoding.EncodeToString(contractParam),
 		}}
-	res := &_ContractTokenRes{}
+	res := &ContractTokenRes{}
 	err := h.rpc.Post(ctx, res, "", req)
 	if err != nil {
 		return nil, fmt.Errorf("fail to GetStorageBalance, err=%v", err)
 	} else if res.Error != nil {
 		return nil, fmt.Errorf("fail to GetStorageBalance, errMsg=%v", res.Error)
 	}
-	tokenStorage := &_TokenStorageBalance{}
+	tokenStorage := &TokenStorageBalance{}
 	if err := json.Unmarshal(res.Result.Result, tokenStorage); err != nil {
 		return nil, fmt.Errorf("fail to Unmarshal tokenStorage, err=%v", err)
 	}
 	return tokenStorage, nil
 }
 
-func (h *Handler) getStorageBounds(ctx context.Context, contract string) (*_TokenStorageBounds, error) {
-	req := &_BaseRequest{JsonRPC: "2.0", ID: "dontcare", Method: "query",
+func (h *Handler) getStorageBounds(ctx context.Context, contract string) (*TokenStorageBounds, error) {
+	req := &BaseRequest{JsonRPC: "2.0", ID: "dontcare", Method: "query",
 		Params: map[string]interface{}{
 			"request_type": "call_function",
 			"finality":     "final",
@@ -375,14 +375,14 @@ func (h *Handler) getStorageBounds(ctx context.Context, contract string) (*_Toke
 			"method_name":  "storage_balance_bounds",
 			"args_base64":  "",
 		}}
-	res := &_ContractTokenRes{}
+	res := &ContractTokenRes{}
 	err := h.rpc.Post(ctx, res, "", req)
 	if err != nil {
 		return nil, fmt.Errorf("fail to call_function for storage_balance_bounds, err=%v", err)
 	} else if res.Error != nil {
 		return nil, fmt.Errorf("fail to call_function for storage_balance_bounds, errMsg=%v", res.Error)
 	}
-	tokenStorageBounds := &_TokenStorageBounds{}
+	tokenStorageBounds := &TokenStorageBounds{}
 	if err := json.Unmarshal(res.Result.Result, tokenStorageBounds); err != nil {
 		return nil, fmt.Errorf("fail to Unmarshal, err=%v", err)
 	}

@@ -33,7 +33,7 @@ func NewHandler(rpcUrl string) (*Handler, error) {
 }
 
 func (h *Handler) GetHeight(ctx context.Context) (string, error) {
-	block := &_Block{}
+	block := &Block{}
 	err := h.rpc.Post(ctx, block, "wallet/getnowblock", nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to get latest block, err=%v", err)
@@ -97,7 +97,7 @@ func (h *Handler) GetTransfersByHash(ctx context.Context, hash string,
 		}
 	}
 
-	in := &_GetTransactionInfoByIdReq{
+	in := &GetTransactionInfoByIdReq{
 		Value: hash,
 	}
 	tx := &Tx{}
@@ -197,12 +197,12 @@ func (h *Handler) SendTx(ctx context.Context, signedHex string) (string, error) 
 	if err != nil {
 		return "", fmt.Errorf("failed to Unmarshal for ntx, err=%v", err)
 	}
-	req := &_BroadcastJsonRawTransactionReq{
+	req := &BroadcastJsonRawTransactionReq{
 		Signature: ntx.Signature,
 		ID:        ntx.ID,
 		RawData:   ntx.RawData,
 	}
-	res := &_BroadcastJsonRawTransactionRes{}
+	res := &BroadcastJsonRawTransactionRes{}
 	err = h.rpc.Post(ctx, res, "wallet/broadcasttransaction", req)
 	if err != nil {
 		return "", fmt.Errorf("failed to broadcasttransaction, err=%v", err)
@@ -219,10 +219,10 @@ func (h *Handler) CheckTx(ctx context.Context, hash string) (*chainrpc.TxResult,
 	}
 	r := &chainrpc.TxResult{}
 
-	req := &_GetTransactionInfoByIdReq{
+	req := &GetTransactionInfoByIdReq{
 		Value: hash,
 	}
-	res := &_GetTransactionInfoByIdRes{}
+	res := &GetTransactionInfoByIdRes{}
 	err := h.rpc.Post(ctx, res, "wallet/gettransactioninfobyid", req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to gettransactioninfobyid, err=%v", err)
@@ -331,14 +331,14 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 		if len(spenderHex) == 0 {
 			return "", fmt.Errorf("spenderHex is empty")
 		}
-		in := &_SmartContractReq{
+		in := &SmartContractReq{
 			OwnerAddress:     ownerHex,
 			ContractAddress:  contractAddressHex,
 			FunctionSelector: "allowance(address,address)",
 			Parameter: "000000000000000000000000" + ownerHex[2:] +
 				"000000000000000000000000" + spenderHex[2:],
 		}
-		out := &_ConstantSmartContractRes{}
+		out := &ConstantSmartContractRes{}
 		err := h.rpc.Post(ctx, out, "wallet/triggerconstantcontract", in)
 		if err != nil {
 			return "", err
@@ -355,13 +355,13 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 		if len(contractAddressHex) == 0 {
 			return "", fmt.Errorf("contractAddressHex is empty")
 		}
-		in := &_SmartContractReq{
+		in := &SmartContractReq{
 			OwnerAddress:     contractAddressHex,
 			ContractAddress:  contractAddressHex,
 			FunctionSelector: "decimals()",
 			Parameter:        "",
 		}
-		out := &_ConstantSmartContractRes{}
+		out := &ConstantSmartContractRes{}
 		err := h.rpc.Post(ctx, out, "wallet/triggerconstantcontract", in)
 		if err != nil {
 			return "", err
@@ -376,10 +376,10 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 
 // unexported
 func (h *Handler) getBaseCoinBalance(ctx context.Context, address string) (uint64, error) {
-	in := &_GetAccountReq{
+	in := &GetAccountReq{
 		wallettron.ConvertToHex(address),
 	}
-	out := &_GetAccountRes{}
+	out := &GetAccountRes{}
 	err := h.rpc.Post(ctx, out, "wallet/getaccount", in)
 	if err != nil {
 		return 0, err
@@ -395,13 +395,13 @@ func (h *Handler) getTokenBalance(ctx context.Context, address string, contract 
 	if len(contract) == 0 {
 		return nil, fmt.Errorf("contract is empty")
 	}
-	in := &_SmartContractReq{
+	in := &SmartContractReq{
 		OwnerAddress:     addressHex,
 		ContractAddress:  contractHex,
 		FunctionSelector: "balanceOf(address)",
 		Parameter:        "000000000000000000000000" + addressHex[2:],
 	}
-	out := &_ConstantSmartContractRes{}
+	out := &ConstantSmartContractRes{}
 	err := h.rpc.Post(ctx, out, "wallet/triggerconstantcontract", in)
 	if err != nil {
 		return nil, err
@@ -411,10 +411,10 @@ func (h *Handler) getTokenBalance(ctx context.Context, address string, contract 
 	r := parseContractNumber(out.ConstantResult[0])
 	return r, nil
 }
-func (h *Handler) getBlockByNumber(ctx context.Context, num uint64) (*_Block, error) {
-	blocks := &_Blocks{}
+func (h *Handler) getBlockByNumber(ctx context.Context, num uint64) (*Block, error) {
+	blocks := &Blocks{}
 	err := h.rpc.Post(ctx, blocks, "wallet/getblockbylimitnext",
-		_BlockRequest{StartNum: num, EndNum: num + 1})
+		BlockRequest{StartNum: num, EndNum: num + 1})
 	if err != nil {
 		return nil, err
 	}
@@ -426,10 +426,10 @@ func (h *Handler) getBlockByNumber(ctx context.Context, num uint64) (*_Block, er
 	}
 	return &blocks.Blocks[0], nil
 }
-func (h *Handler) getAccountResource(ctx context.Context, address string) (*_GetAccountResourceOut, error) {
-	out := &_GetAccountResourceOut{}
+func (h *Handler) getAccountResource(ctx context.Context, address string) (*GetAccountResourceOut, error) {
+	out := &GetAccountResourceOut{}
 	err := h.rpc.Post(ctx, out, "wallet/getaccountresource",
-		_GetAccountResourceIn{Address: address, Visible: true})
+		GetAccountResourceIn{Address: address, Visible: true})
 	if err != nil {
 		return nil, err
 	}
@@ -445,165 +445,3 @@ func parseContractNumber(data string) *big.Int {
 	}
 	return nil
 }
-
-// SignatureTransferMethod is the TRC20 transfer(address,uint256) method selector.
-const SignatureTransferMethod = "a9059cbb"
-
-// types
-type (
-	_GetAccountReq struct {
-		Address string `json:"address"`
-	}
-	_GetAccountRes struct {
-		Address    string `json:"address"`
-		Balance    uint64 `json:"balance"`
-		CreateTime int64  `json:"create_time"`
-	}
-
-	_GetAccountResourceIn struct {
-		Address string `json:"address"`
-		Visible bool   `json:"visible"`
-	}
-	_GetAccountResourceOut struct {
-		FreeNetUsed  int64 `json:"freeNetUsed"`
-		FreeNetLimit int64 `json:"freeNetLimit"`
-	}
-
-	_GetTransactionInfoByIdReq struct {
-		Value string `json:"value"`
-	}
-	_GetTransactionInfoByIdRes struct {
-		Result         string `json:"result"`
-		TxID           string `json:"id"`
-		BlockNumber    uint64 `json:"blockNumber"`
-		BlockTimeStamp int64  `json:"blockTimeStamp"`
-		Receipt        struct {
-			NetUsage uint64 `json:"net_usage"`
-			Result   string `json:"result"`
-		} `json:"receipt"`
-		Log []struct {
-			Address string   `json:"address"`
-			Topics  []string `json:"topics"`
-			Data    string   `json:"data"`
-		} `json:"log"`
-	}
-
-	_SmartContractReq struct {
-		OwnerAddress     string   `json:"owner_address"`
-		ContractAddress  string   `json:"contract_address"`
-		FunctionSelector string   `json:"function_selector"`
-		Parameter        string   `json:"parameter"`
-		FeeLimit         int64    `json:"fee_limit"`
-		CallValue        *big.Int `json:"call_value"`
-		Visible          bool     `json:"visible"`
-	}
-
-	_ConstantSmartContractRes struct {
-		Result struct {
-			Result bool `json:"result"`
-		} `json:"result"`
-		ConstantResult []string `json:"constant_result"`
-	}
-
-	_BlockRequest struct {
-		StartNum uint64 `json:"startNum"`
-		EndNum   uint64 `json:"endNum"`
-	}
-
-	_Blocks struct {
-		Blocks []_Block `json:"block"`
-	}
-
-	_Block struct {
-		BlockId     string `json:"blockID"`
-		Txs         []Tx   `json:"transactions"`
-		BlockHeader struct {
-			Data BlockData `json:"raw_data"`
-		} `json:"block_header"`
-	}
-
-	BlockData struct {
-		Number         uint64 `json:"number"`
-		TxTrieRoot     string `json:"txTrieRoot"`
-		WitnessAddress string `json:"witness_address"`
-		ParentHash     string `json:"parentHash"`
-		Version        int    `json:"version"`
-		Timestamp      int64  `json:"timestamp"`
-	}
-	Tx struct {
-		Ret       []_TxRet `json:"ret,omitempty"`
-		Signature []string `json:"signature,omitempty"`
-		ID        string   `json:"txID,omitempty"`
-		BlockTime int64    `json:"block_timestamp,omitempty"`
-		Data      _TxData  `json:"raw_data,omitempty"`
-		Visible   bool     `json:"visible,omitempty"`
-	}
-
-	_TxRet struct {
-		ContractRet string `json:"contractRet"`
-	}
-
-	_TxData struct {
-		Contracts     []_TRXContract `json:"contract"`
-		RefBlockBytes string         `json:"ref_block_bytes,omitempty"`
-		RefBlockHash  string         `json:"ref_block_hash,omitempty"`
-		Expiration    int64          `json:"expiration,omitempty"`
-		FeeLimit      int64          `json:"fee_limit,omitempty"`
-		Timestamp     int64          `json:"timestamp"`
-	}
-
-	_TRXContract struct {
-		Type      string `json:"type"`
-		Parameter struct {
-			Value   _TransferValue `json:"value"`
-			TypeUrl string         `json:"type_url"`
-		} `json:"parameter"`
-	}
-	_TransferValue struct {
-		OwnerAddress    string   `json:"owner_address,omitempty"`
-		ToAddress       string   `json:"to_address,omitempty"`
-		Data            string   `json:"data,omitempty"`
-		ContractAddress string   `json:"contract_address,omitempty"`
-		Amount          *big.Int `json:"amount,omitempty"`
-		CallValue       *big.Int `json:"call_value,omitempty"`
-		Visible         bool     `json:"visible"`
-	}
-
-	_BroadcastJsonRawTransactionReq struct {
-		Signature []string          `json:"signature,omitempty"`
-		ID        string            `json:"txID,omitempty"`
-		RawData   *wallettron.TxRaw `json:"raw_data,omitempty"`
-	}
-	_BroadcastJsonRawTransactionRes struct {
-		Result  bool   `json:"result,omitempty"`
-		Code    string `json:"code,omitempty"`
-		TxID    string `json:"txid,omitempty"`
-		Message string `json:"message,omitempty"`
-	}
-
-	_BroadcastProtoRawTransactionReq struct {
-		Transaction string `json:"transaction"`
-	}
-	_BroadcastProtoRawTransactionRes struct {
-		Result      bool   `json:"result"`
-		Code        string `json:"code"`
-		Error       string `json:"error"`
-		TxID        string `json:"txID"`
-		Message     string `json:"message"`
-		Transaction string `json:"transaction"`
-	}
-	_TriggerSmartContractReq struct {
-		ContractAddress []byte
-		Data            []byte
-		Owner           []byte
-		BlockNumber     int64
-	}
-
-	RpcBlock struct {
-		BlockId     string `json:"blockID"`
-		Txs         []Tx   `json:"transactions"`
-		BlockHeader struct {
-			Data BlockData `json:"raw_data"`
-		} `json:"block_header"`
-	}
-)

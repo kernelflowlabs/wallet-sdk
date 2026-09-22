@@ -43,7 +43,7 @@ func (h *Handler) GetHeight(ctx context.Context) (string, error) {
 		return h.getHeightSei(ctx)
 	}
 
-	out := &_GetBlockRes{}
+	out := &GetBlockRes{}
 	path := "cosmos/base/tendermint/v1beta1/blocks/latest"
 	err := h.rpc.Get(ctx, out, path, nil)
 	if err != nil {
@@ -66,7 +66,7 @@ func (h *Handler) GetBalance(ctx context.Context, address, contractAddress, bloc
 		demon = tmp[0]
 	}
 
-	out := &_GetBalanceRes{}
+	out := &GetBalanceRes{}
 	path := "cosmos/bank/v1beta1/balances/" + address
 	err := h.rpc.Get(ctx, out, path, nil)
 	if err != nil {
@@ -115,7 +115,7 @@ func (h *Handler) GetTransfersByHash(ctx context.Context, hash string, confirmat
 	}
 
 	demon := walletcosmos.Denom(h.network)
-	out := &_GetTxRes{}
+	out := &GetTxRes{}
 	path := "cosmos/tx/v1beta1/txs/" + hash
 	err = h.rpc.Get(ctx, out, path, nil)
 	if err != nil {
@@ -169,9 +169,9 @@ func (h *Handler) SendTx(ctx context.Context, signedHex string) (string, error) 
 	if err != nil {
 		return "", fmt.Errorf("fail to DecodeString for signedHex, err=%v", err)
 	}
-	out := &_SendTxRes{}
+	out := &SendTxRes{}
 	path := "cosmos/tx/v1beta1/txs"
-	in := &_SendTxReq{
+	in := &SendTxReq{
 		TxBytes: signedBytes,
 		Mode:    "BROADCAST_MODE_SYNC",
 	}
@@ -190,7 +190,7 @@ func (h *Handler) SendTx(ctx context.Context, signedHex string) (string, error) 
 func (h *Handler) CheckTx(ctx context.Context, hash string) (*chainrpc.TxResult, error) {
 	result := &chainrpc.TxResult{}
 
-	out := &_GetTxRes{}
+	out := &GetTxRes{}
 	path := "cosmos/tx/v1beta1/txs/" + hash
 	err := h.rpc.Get(ctx, out, path, nil)
 	if err != nil {
@@ -222,7 +222,7 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 	switch instruction {
 	case "getAccountInfo":
 		result := &walletcosmos.AccountInfo{}
-		out := &_GetAccInfoRes{}
+		out := &GetAccInfoRes{}
 		path := "cosmos/auth/v1beta1/accounts/" + params
 		err := h.rpc.Get(ctx, out, path, nil)
 		if err != nil {
@@ -252,71 +252,14 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 	return "", fmt.Errorf("unsupported function")
 }
 
-type _BaseResponse struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
+func (h *Handler) getHeightSei(ctx context.Context) (string, error) {
+	out := &SeiStatus{}
+	path := "status"
+	err := h.rpc.Get(ctx, out, path, nil)
+	if err != nil {
+		return "", fmt.Errorf("fail to get latest block,err=%s", err)
+	} else if out.SyncInfo.LatestBlockHeight == "0" || out.SyncInfo.LatestBlockHeight == "" {
+		return "", fmt.Errorf("fail to get latest block, height==0")
+	}
+	return out.SyncInfo.LatestBlockHeight, nil
 }
-
-type (
-	_GetAccInfoRes struct {
-		_BaseResponse
-		Account struct {
-			AccountNumber string `json:"account_number"`
-			Sequence      string `json:"sequence"`
-		} `json:"account"`
-	}
-
-	_GetBalanceRes struct {
-		_BaseResponse
-		Balances []struct {
-			Denom  string `json:"denom"`
-			Amount string `json:"amount"`
-		} `json:"balances"`
-	}
-
-	_GetBlockRes struct {
-		_BaseResponse
-		Block _Block `json:"block"`
-	}
-	_Block struct {
-		Header struct {
-			Height string `json:"height"`
-		} `json:"header"`
-	}
-	_RestTx struct {
-		Height    string `json:"height"`
-		Txhash    string `json:"txhash"`
-		Code      int    `json:"code"`
-		RawLog    string `json:"raw_log"`
-		GasWanted string `json:"gas_wanted"`
-		GasUsed   string `json:"gas_used"`
-		Tx        struct {
-			Body struct {
-				Messages []struct {
-					Type        string `json:"@type"`
-					FromAddress string `json:"from_address"`
-					ToAddress   string `json:"to_address"`
-					Amount      []struct {
-						Denom  string `json:"denom"`
-						Amount string `json:"amount"`
-					} `json:"amount"`
-				} `json:"messages"`
-				Memo string `json:"memo"`
-			} `json:"body"`
-		} `json:"tx"`
-		Timestamp string `json:"timestamp,omitempty"`
-	}
-
-	_SendTxReq struct {
-		TxBytes []byte `json:"tx_bytes"`
-		Mode    string `json:"mode"`
-	}
-	_SendTxRes struct {
-		_BaseResponse
-		TxResponse _RestTx `json:"tx_response"`
-	}
-	_GetTxRes struct {
-		_BaseResponse
-		TxResponse _RestTx `json:"tx_response"`
-	}
-)

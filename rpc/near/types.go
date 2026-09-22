@@ -2,37 +2,37 @@ package near
 
 import "fmt"
 
-func (err *_ErrorResponse) Error() string {
+func (err *ErrorResponse) Error() string {
 	return fmt.Sprintf("RPC ERROR code=%d,message=%s,data=%s", err.Code, err.Message, err.Data)
 }
 
 type (
-	_BaseRequest struct {
+	BaseRequest struct {
 		JsonRPC string      `json:"jsonrpc"`
 		ID      string      `json:"id"`
 		Method  string      `json:"method"`
 		Params  interface{} `json:"params"`
 	}
-	_ErrorResponse struct {
+	ErrorResponse struct {
 		Code    int         `json:"code"`
 		Name    string      `json:"name"`
 		Message string      `json:"message"`
 		Data    interface{} `json:"data"`
 		Cause   interface{} `json:"cause"`
 	}
-	_BaseResponse struct {
-		JsonRPC string          `json:"jsonrpc"`
-		ID      string          `json:"id"`
-		Error   *_ErrorResponse `json:"error"`
+	BaseResponse struct {
+		JsonRPC string         `json:"jsonrpc"`
+		ID      string         `json:"id"`
+		Error   *ErrorResponse `json:"error"`
 	}
 )
 
 type (
-	_GetBlockRes struct {
-		_BaseResponse
-		Result _Block `json:"result"`
+	GetBlockRes struct {
+		BaseResponse
+		Result Block `json:"result"`
 	}
-	_Block struct {
+	Block struct {
 		Author string `json:"author"`
 		Header struct {
 			Approvals             []interface{} `json:"approvals"`
@@ -87,11 +87,11 @@ type (
 		} `json:"chunks"`
 	}
 
-	_GetChunkRes struct {
-		_BaseResponse
-		Result _Chunk `json:"result"`
+	GetChunkRes struct {
+		BaseResponse
+		Result Chunk `json:"result"`
 	}
-	_Chunk struct {
+	Chunk struct {
 		Author string `json:"author"`
 		Header struct {
 			BalanceBurnt         string        `json:"balance_burnt"`
@@ -129,19 +129,19 @@ type (
 		} `json:"transactions"`
 	}
 
-	_GetBalanceRes struct {
-		_BaseResponse
-		Result _Account `json:"result"`
+	GetBalanceRes struct {
+		BaseResponse
+		Result Account `json:"result"`
 	}
-	_Account struct {
+	Account struct {
 		Amount string `json:"amount"`
 	}
 
-	_ReceiptRes struct {
-		_BaseResponse
-		Result _TransactionReceipt `json:"result"`
+	ReceiptRes struct {
+		BaseResponse
+		Result TransactionReceipt `json:"result"`
 	}
-	_TransactionReceipt struct {
+	TransactionReceipt struct {
 		ReceiptsOutcome []struct {
 			BlockHash string `json:"block_hash"`
 			ID        string `json:"id"`
@@ -204,11 +204,11 @@ type (
 			} `json:"proof"`
 		} `json:"transaction_outcome"`
 	}
-	_GetNonceRes struct {
-		_BaseResponse
-		Result _AccountNonce `json:"result"`
+	GetNonceRes struct {
+		BaseResponse
+		Result AccountNonce `json:"result"`
 	}
-	_AccountNonce struct {
+	AccountNonce struct {
 		Error       string `json:"error"`
 		Nonce       uint64 `json:"nonce"`
 		Permission  string `json:"permission"`
@@ -216,23 +216,23 @@ type (
 		BlockHash   string `json:"block_hash"`
 	}
 
-	_ContractTokenRes struct {
-		_BaseResponse
-		Result _ContractRes `json:"result"`
+	ContractTokenRes struct {
+		BaseResponse
+		Result ContractRes `json:"result"`
 	}
 
-	_ContractRes struct {
+	ContractRes struct {
 		BlockHash   string        `json:"block_hash"`
 		BlockHeight int           `json:"block_height"`
 		Logs        []interface{} `json:"logs"`
 		Result      []uint8       `json:"result"`
 	}
 
-	_TokenStorageBounds struct {
+	TokenStorageBounds struct {
 		Min string `json:"min"`
 		Max string `json:"max"`
 	}
-	_TokenStorageBalance struct {
+	TokenStorageBalance struct {
 		Total     string `json:"total"`
 		Available string `json:"available"`
 	}

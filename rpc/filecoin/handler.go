@@ -36,8 +36,8 @@ func NewHandler(rpcUrl string) (*Handler, error) {
 }
 
 func (h *Handler) GetHeight(ctx context.Context) (string, error) {
-	req := &_BaseRequest{JsonRPC: "2.0", ID: 1, Method: "Filecoin.ChainHead"}
-	res := &_GetBlockHeightRes{Result: &_GetBlockHeight{}}
+	req := &BaseRequest{JsonRPC: "2.0", ID: 1, Method: "Filecoin.ChainHead"}
+	res := &GetBlockHeightRes{Result: &GetBlockHeight{}}
 	err := h.rpc.Post(ctx, res, "", req)
 	if err != nil {
 		return "", fmt.Errorf("fail to GetHeight, err=%v", err)
@@ -53,8 +53,8 @@ func (h *Handler) GetBalance(ctx context.Context, address, contractAddress, bloc
 	if contractAddress != signing.MagicContactAddressForNative {
 		return "", fmt.Errorf("only basecoin supported")
 	}
-	req := &_BaseRequest{JsonRPC: "2.0", ID: 1, Method: "Filecoin.WalletBalance", Params: []string{address}}
-	res := &_GetBalanceResponse{}
+	req := &BaseRequest{JsonRPC: "2.0", ID: 1, Method: "Filecoin.WalletBalance", Params: []string{address}}
+	res := &GetBalanceResponse{}
 	err := h.rpc.Post(ctx, res, "", req)
 	if err != nil {
 		return "", fmt.Errorf("fail to WalletBalance, err=%v", err)
@@ -124,13 +124,13 @@ func (h *Handler) SendTx(ctx context.Context, signedHex string) (string, error) 
 	if err != nil {
 		return "", fmt.Errorf("fail to DecodeString, err=%v", err)
 	}
-	signedTx := &_SignedMessage{}
+	signedTx := &SignedMessage{}
 	if err := json.Unmarshal(signedBytes, signedTx); err != nil {
 		return "", fmt.Errorf("fail to Unmarshal for signedTx, err=%v", err)
 	}
-	req := &_BaseRequest{JsonRPC: "2.0", ID: 1, Method: "Filecoin.MpoolPush",
+	req := &BaseRequest{JsonRPC: "2.0", ID: 1, Method: "Filecoin.MpoolPush",
 		Params: []interface{}{signedTx}}
-	res := &_MpoolPushResponse{}
+	res := &MpoolPushResponse{}
 	err = h.rpc.Post(ctx, res, "", req)
 	if err != nil {
 		return "", fmt.Errorf("fail to send tx, err=%v", err)
@@ -176,9 +176,9 @@ func (h *Handler) CallContract(ctx context.Context, contractAddress, params, blo
 func (h *Handler) InquireChain(ctx context.Context, instruction, params string) (string, error) {
 	switch instruction {
 	case "getNonce":
-		req := &_BaseRequest{JsonRPC: "2.0", ID: 1, Method: "Filecoin.MpoolGetNonce",
+		req := &BaseRequest{JsonRPC: "2.0", ID: 1, Method: "Filecoin.MpoolGetNonce",
 			Params: []interface{}{params}}
-		res := &_GetMpoolGetNonceRes{}
+		res := &GetMpoolGetNonceRes{}
 		err := h.rpc.Post(ctx, res, "", req)
 		if err != nil {
 			return "", fmt.Errorf("fail to GetNonce, err=%v", err)
@@ -205,9 +205,9 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 			"Value": p.Value, "GasLimit": 0, "GasFeeCap": "0", "GasPremium": "0",
 			"Method": 0, "Params": "",
 		}
-		req := &_BaseRequest{JsonRPC: "2.0", ID: 1, Method: "Filecoin.GasEstimateMessageGas",
+		req := &BaseRequest{JsonRPC: "2.0", ID: 1, Method: "Filecoin.GasEstimateMessageGas",
 			Params: []interface{}{msg, map[string]interface{}{"MaxFee": "0"}, nil}}
-		res := &_GasEstimateRes{}
+		res := &GasEstimateRes{}
 		if err := h.rpc.Post(ctx, res, "", req); err != nil {
 			return "", fmt.Errorf("fail to GasEstimateMessageGas, err=%v", err)
 		} else if res.Error.Code != 0 {
@@ -227,10 +227,10 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 	return "", fmt.Errorf("unsupported function")
 }
 
-func (h *Handler) checkTransactionStatus(ctx context.Context, cid string) (*_StateSearchMsgLimited, error) {
-	req := &_BaseRequest{JsonRPC: "2.0", ID: 1, Method: "Filecoin.StateSearchMsgLimited",
+func (h *Handler) checkTransactionStatus(ctx context.Context, cid string) (*StateSearchMsgLimited, error) {
+	req := &BaseRequest{JsonRPC: "2.0", ID: 1, Method: "Filecoin.StateSearchMsgLimited",
 		Params: []interface{}{map[string]interface{}{"/": cid}, 10000}}
-	res := &_StateSearchMsgLimitedRes{}
+	res := &StateSearchMsgLimitedRes{}
 	err := h.rpc.Post(ctx, res, "", req)
 	if err != nil {
 		return nil, err
@@ -240,10 +240,10 @@ func (h *Handler) checkTransactionStatus(ctx context.Context, cid string) (*_Sta
 	return res.Result, nil
 }
 
-func (h *Handler) getTipSetByHeight(ctx context.Context, height uint64) (*_GetTipSetByHeight, error) {
-	req := &_BaseRequest{JsonRPC: "2.0", ID: 1, Method: "Filecoin.ChainGetTipSetByHeight",
+func (h *Handler) getTipSetByHeight(ctx context.Context, height uint64) (*GetTipSetByHeight, error) {
+	req := &BaseRequest{JsonRPC: "2.0", ID: 1, Method: "Filecoin.ChainGetTipSetByHeight",
 		Params: []interface{}{height, nil}}
-	res := &_GetTipSetByHeightRes{}
+	res := &GetTipSetByHeightRes{}
 	err := h.rpc.Post(ctx, res, "", req)
 	if err != nil {
 		return nil, err
@@ -253,10 +253,10 @@ func (h *Handler) getTipSetByHeight(ctx context.Context, height uint64) (*_GetTi
 	return res.Result, nil
 }
 
-func (h *Handler) getMessageByHash(ctx context.Context, cid string) (*_Message, error) {
-	req := &_BaseRequest{JsonRPC: "2.0", ID: 1, Method: "Filecoin.ChainGetMessage",
+func (h *Handler) getMessageByHash(ctx context.Context, cid string) (*Message, error) {
+	req := &BaseRequest{JsonRPC: "2.0", ID: 1, Method: "Filecoin.ChainGetMessage",
 		Params: []interface{}{map[string]interface{}{"/": cid}}}
-	res := &_GetMessageResponse{}
+	res := &GetMessageResponse{}
 	err := h.rpc.Post(ctx, res, "", req)
 	if err != nil {
 		return nil, err

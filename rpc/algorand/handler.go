@@ -36,7 +36,7 @@ func NewHandler(rpcUrl string) (*Handler, error) {
 }
 
 func (h *Handler) GetHeight(ctx context.Context) (string, error) {
-	out := &_NodeStatusResponse{}
+	out := &NodeStatusResponse{}
 	err := h.rpc.Get(ctx, out, "v2/status", nil)
 	if err != nil {
 		return "", err
@@ -130,7 +130,7 @@ func (h *Handler) SendTx(ctx context.Context, signedHex string) (string, error) 
 	if err != nil {
 		return "", fmt.Errorf("fail to DecodeString signedHex, err=%v", err)
 	}
-	out := &_SendTxOut{}
+	out := &SendTxOut{}
 	h.rpc.SetHeader("Content-Type", "application/x-binary")
 	err = h.rpc.PostWithOutEncoded(ctx, out, "v2/transactions", signedBytes)
 	if err != nil {
@@ -172,7 +172,7 @@ func (h *Handler) CallContract(ctx context.Context, contractAddress, params, blo
 func (h *Handler) InquireChain(ctx context.Context, instruction, params string) (string, error) {
 	switch instruction {
 	case "transactionsParams":
-		out := &_TransactionParams{}
+		out := &TransactionParams{}
 		err := h.rpc.Get(ctx, out, "v2/transactions/params", nil)
 		if err != nil {
 			return "", fmt.Errorf("fail to get latest transactions params, err=%v", err)
@@ -198,7 +198,7 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 		if err != nil {
 			return "", fmt.Errorf("fail to ParseUint for contractAddress, err=%v", err)
 		}
-		out := &_AccountAddress{}
+		out := &AccountAddress{}
 		err = h.rpc.Get(ctx, out, "v2/accounts/"+tmp[0], nil)
 		if err != nil {
 			return "", fmt.Errorf("fail to get balance, err=%v", err)
@@ -212,7 +212,7 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 		}
 		return "false", nil
 	case "getMinFee":
-		out := &_TransactionParams{}
+		out := &TransactionParams{}
 		err := h.rpc.Get(ctx, out, "v2/transactions/params", nil)
 		if err != nil {
 			return "", fmt.Errorf("fail to get latest transactions params, err=%v", err)
@@ -225,7 +225,7 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 }
 
 func (h *Handler) getBaseCoinBalance(ctx context.Context, address string) (*big.Int, error) {
-	out := &_AccountAddress{}
+	out := &AccountAddress{}
 	err := h.rpc.Get(ctx, out, "v2/accounts/"+address, nil)
 	if err != nil {
 		return nil, fmt.Errorf("fail to get balance, err=%v", err)
@@ -240,7 +240,7 @@ func (h *Handler) getTokenBalance(ctx context.Context, address, contract string)
 	if err != nil {
 		return nil, fmt.Errorf("fail to ParseUint for contract, err=%v", err)
 	}
-	out := &_AccountAddress{}
+	out := &AccountAddress{}
 	err = h.rpc.Get(ctx, out, "v2/accounts/"+address, nil)
 	if err != nil {
 		return nil, fmt.Errorf("fail to get balance, err=%v", err)
@@ -255,8 +255,8 @@ func (h *Handler) getTokenBalance(ctx context.Context, address, contract string)
 	return big.NewInt(0), nil
 }
 
-func (h *Handler) checkTransactionById(ctx context.Context, txID string) (*_PendingTransactionResponse, error) {
-	out := &_PendingTransactionResponse{}
+func (h *Handler) checkTransactionById(ctx context.Context, txID string) (*PendingTransactionResponse, error) {
+	out := &PendingTransactionResponse{}
 	err := h.rpc.Get(ctx, out, "v2/transactions/pending/"+txID, nil)
 	if err != nil {
 		return nil, fmt.Errorf("fail to get pending tx, err=%v", err)
