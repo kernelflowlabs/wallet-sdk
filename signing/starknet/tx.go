@@ -39,7 +39,16 @@ func (tx *TxBuilder) Build() error {
 		contract = ethContractAddress
 	}
 	sender := hexToBig(tx.Sender)
+	if sender == nil {
+		return fmt.Errorf("bad sender %s", tx.Sender)
+	}
 	recipient := hexToBig(tx.Recipient)
+	if recipient == nil {
+		return fmt.Errorf("bad recipient %s", tx.Recipient)
+	}
+	if hexToBig(contract) == nil {
+		return fmt.Errorf("bad contractAddress %s", contract)
+	}
 	amount, ok := new(big.Int).SetString(tx.Amount, 10)
 	if !ok {
 		return fmt.Errorf("bad amount %s", tx.Amount)
