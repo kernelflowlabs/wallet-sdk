@@ -113,6 +113,9 @@ func safeCap(projectedBase, tip, base *big.Int) *big.Int {
 
 // for GuaranteeNativeAmt
 func GuaranteeNativeAmt(fee *Fee, gasLimitStr, nativeBalStr string, l1FeeStr string, isLegacy bool) (bool, error) {
+	if fee == nil {
+		return false, fmt.Errorf("fee is nil")
+	}
 	gasLimit, ok := big.NewInt(0).SetString(gasLimitStr, 10)
 	if !ok {
 		return false, fmt.Errorf("failed to SetString for gasLimitStr")
@@ -128,32 +131,20 @@ func GuaranteeNativeAmt(fee *Fee, gasLimitStr, nativeBalStr string, l1FeeStr str
 		if !ok {
 			return false, fmt.Errorf("failed to SetString for gasPrice")
 		}
-		total = gasPrice.Mul(gasPrice, gasLimit)
+		total = new(big.Int).Mul(gasPrice, gasLimit)
 	} else {
-		baseFee, ok := big.NewInt(0).SetString(fee.BaseFee, 10)
-		if !ok {
-			return false, fmt.Errorf("failed to SetString for baseFee")
-		}
-		priorityFee, ok := big.NewInt(0).SetString(fee.PriorityFee, 10)
-		if !ok {
-			return false, fmt.Errorf("failed to SetString for priorityFee")
-		}
 		maxFeeCap, ok := big.NewInt(0).SetString(fee.MaxFeeCap, 10)
 		if !ok {
 			return false, fmt.Errorf("failed to SetString for maxFeeCap")
 		}
-		effective := new(big.Int).Add(baseFee, priorityFee)
-		if effective.Cmp(maxFeeCap) == 1 {
-			effective = maxFeeCap
+		total = new(big.Int).Mul(maxFeeCap, gasLimit)
+	}
+	if l1FeeStr != "" {
+		l1Fee, ok := big.NewInt(0).SetString(l1FeeStr, 10)
+		if !ok {
+			return false, fmt.Errorf("failed to SetString for l1Fee")
 		}
-		total = effective.Mul(effective, gasLimit)
-		if l1FeeStr != "" {
-			l1Fee, ok := big.NewInt(0).SetString(l1FeeStr, 10)
-			if !ok {
-				return false, fmt.Errorf("failed to SetString for l1Fee")
-			}
-			total.Add(total, l1Fee)
-		}
+		total.Add(total, l1Fee)
 	}
 	return nativeBal.Cmp(total) >= 0, nil
 }
