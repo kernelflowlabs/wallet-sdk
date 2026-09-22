@@ -1,7 +1,6 @@
 package solana
 
 import (
-	"crypto/ed25519"
 	"encoding/hex"
 	"fmt"
 	"github.com/kernelflowlabs/wallet-sdk/crypto/key"
@@ -269,8 +268,10 @@ func (tx *TxBuilder) ConcatSignature(signature string, isDerFormat bool) (string
 		if err != nil {
 			return "", fmt.Errorf("failed to DecodeString for sigHash, err=%v", err)
 		}
-		nonceSk := ed25519.NewKeyFromSeed(noncePrivateKeyBytes)
-		nonceSig := ed25519.Sign(nonceSk, sigHash)
+		nonceSig, err := key.SignWithPrivateKeyED25519(noncePrivateKeyBytes, sigHash)
+		if err != nil {
+			return "", fmt.Errorf("invalid NonceAccountPrivateKey, err=%v", err)
+		}
 		err = ntx.AddSignature(nonceSig)
 		if err != nil {
 			return "", fmt.Errorf("failed to AddSignature for nonceSig, err=%v", err)
