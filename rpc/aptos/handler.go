@@ -20,6 +20,8 @@ import (
 
 var _ chainrpc.BasicChainHandler = (*Handler)(nil)
 
+const TxValiditySeconds = 600
+
 type Handler struct {
 	rpc       *httpc.Request
 	submitRpc *httpc.Request
@@ -147,8 +149,12 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 		} else if res.Message != "" {
 			return "", fmt.Errorf("failed to get ledger info, errMsg=%v", res.Message)
 		}
+		ledgerMicros, err := strconv.ParseUint(res.LedgerTimestamp, 10, 64)
+		if err != nil {
+			return "", fmt.Errorf("invalid ledger timestamp %q, err=%w", res.LedgerTimestamp, err)
+		}
 		result.ChainId = strconv.FormatUint(res.ChainId, 10)
-		result.ExpirationTimestamp = res.LedgerTimestamp
+		result.ExpirationTimestamp = strconv.FormatUint(ledgerMicros/1e6+TxValiditySeconds, 10)
 		resultBytes, err := json.Marshal(result)
 		if err != nil {
 			return "", fmt.Errorf("failed to Marshal for result, err=%v", err)
