@@ -229,16 +229,27 @@ func (bn BigInt) Bytes() []byte {
 	return b.Bytes()
 }
 
+func (bn *BigInt) cborBytes() []byte {
+	b := (*big.Int)(bn)
+	switch b.Sign() {
+	case 0:
+		return []byte{}
+	case -1:
+		return append([]byte{1}, b.Bytes()...)
+	}
+	return append([]byte{0}, b.Bytes()...)
+}
+
 func (m *nativeTx) Serialize() []byte {
 	i := []interface{}{
 		0,
 		addressToBytes(m.To),
 		addressToBytes(m.From),
 		m.Nonce,
-		append([]byte{0}, m.Value.Bytes()...),
+		m.Value.cborBytes(),
 		m.GasLimit,
-		append([]byte{0}, m.GasFeeCap.Bytes()...),
-		append([]byte{0}, m.GasPremium.Bytes()...),
+		m.GasFeeCap.cborBytes(),
+		m.GasPremium.cborBytes(),
 		m.Method,
 		m.Params,
 	}
