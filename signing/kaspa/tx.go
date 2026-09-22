@@ -81,6 +81,9 @@ func (tx *TxBuilder) Build() error {
 			return fmt.Errorf("only 1 utxo supported")
 		}
 		value, _ := strconv.ParseUint(tx.Ingredient.Utxos.List[0].Value, 10, 64)
+		if fee >= value {
+			return fmt.Errorf("fee %d exceeds the utxo value %d", fee, value)
+		}
 		totalSend = value - fee
 		if totalSend <= DefaultDust {
 			return fmt.Errorf("dust amount")
