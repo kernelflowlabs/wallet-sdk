@@ -183,6 +183,18 @@ func PayToScriptHashScript(redeemScript []byte) ([]byte, error) {
 		AddOp(opEqual).Script()
 }
 
+func payToAddressScript(version byte, payload []byte) ([]byte, error) {
+	switch version {
+	case pubKeyAddrID:
+		return NewScriptBuilder().AddData(payload).AddOp(opCheckSig).Script()
+	case pubKeyECDSAAddrID:
+		return NewScriptBuilder().AddData(payload).AddOp(opCheckSigECDSA).Script()
+	case scriptHashAddrID:
+		return NewScriptBuilder().AddOp(opBlake2b).AddData(payload).AddOp(opEqual).Script()
+	}
+	return nil, fmt.Errorf("unsupported address version %d", version)
+}
+
 func ExtractScriptPubKeyAddress(scriptPubKey *externalapi.ScriptPublicKey, dagParams *dagconfig.Params) (ScriptClass, util.Address, error) {
 	if scriptPubKey.Version > constants.MaxScriptPublicKeyVersion {
 		return NonStandardTy, nil, nil

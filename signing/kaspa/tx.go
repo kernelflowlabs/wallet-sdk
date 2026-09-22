@@ -28,9 +28,12 @@ func (tx *TxBuilder) Build() error {
 	if tx == nil {
 		return fmt.Errorf("tx == nil")
 	}
-	_, senderPubkey, err := decodeAddress(tx.Ingredient.Sender, bech32PrefixKaspaMainnet)
+	senderVersion, senderPubkey, err := decodeAddress(tx.Ingredient.Sender, bech32PrefixKaspaMainnet)
 	if err != nil {
 		return fmt.Errorf("failed to DecodeAddress for Sender, err=%v", err)
+	}
+	if senderVersion != pubKeyAddrID {
+		return fmt.Errorf("sender must be a Schnorr public key address, got version %d", senderVersion)
 	}
 	senderScript, err := NewScriptBuilder().AddData(senderPubkey).AddOp(OpCheckSig).Script()
 	if err != nil {
@@ -42,12 +45,12 @@ func (tx *TxBuilder) Build() error {
 	var redeemScript []byte
 	totalSend := uint64(0)
 	if tx.Ingredient.TxType == signing.TxTypeTransfer {
-		_, recipientPubkey, err := decodeAddress(tx.Ingredient.Recipient, bech32PrefixKaspaMainnet)
+		recipientVersion, recipientPayload, err := decodeAddress(tx.Ingredient.Recipient, bech32PrefixKaspaMainnet)
 		if err != nil {
 			return fmt.Errorf("failed to DecodeAddress for Recipient=%s, err=%v",
 				tx.Ingredient.Recipient, err)
 		}
-		recipientScript, err = NewScriptBuilder().AddData(recipientPubkey).AddOp(OpCheckSig).Script()
+		recipientScript, err = payToAddressScript(recipientVersion, recipientPayload)
 		if err != nil {
 			return fmt.Errorf("failed to NewScriptBuilder for recipient, err=%v", err)
 		}

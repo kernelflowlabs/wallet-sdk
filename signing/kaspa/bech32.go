@@ -193,17 +193,23 @@ func decode(encoded string) (string, []byte, error) {
 	return prefix, decoded[:len(decoded)-checksumLength], nil
 }
 
-func decodeAddress(addr string, expectedPrefix string) (string, []byte, error) {
+func decodeAddress(addr string, expectedPrefix string) (byte, []byte, error) {
 	prefix, decoded, err := decode(addr)
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to decode addr, err=%v", err)
+		return 0, nil, fmt.Errorf("failed to decode addr, err=%v", err)
 	}
 	if prefix != expectedPrefix {
-		return "", nil, fmt.Errorf("invalid prefix")
+		return 0, nil, fmt.Errorf("invalid prefix")
 	}
 	converted := convertBits(decoded, fiveToEightBits)
-	payload := converted[1:]
-	return prefix, payload, nil
+	if len(converted) == 0 {
+		return 0, nil, fmt.Errorf("empty address payload")
+	}
+	version, payload := converted[0], converted[1:]
+	if want, ok := addressPayloadLength[version]; !ok || len(payload) != want {
+		return 0, nil, fmt.Errorf("unsupported address version %d with payload length %d", version, len(payload))
+	}
+	return version, payload, nil
 }
 
 func correctAddress(address string) string {
@@ -235,6 +241,15 @@ const (
 	bech32PrefixKaspaTestNet = "kaspatest"
 	bech32PrefixKaspaMainnet = "kaspa"
 	pubKeyAddrID             = 0x00
+	pubKeyECDSAAddrID        = 0x01
+	scriptHashAddrID         = 0x08
 )
+
+var addressPayloadLength = map[byte]int{
+	pubKeyAddrID:      32,
+	pubKeyECDSAAddrID: 33,
+	scriptHashAddrID:  32,
+}
+
 const charset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 const checksumLength = 8
