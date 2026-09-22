@@ -27,6 +27,14 @@ func NewAccountFromMnemonic(mnemonic, path, network string) (signing.AccountHand
 	return NewAccountFromPrivateKey(privateKey, network)
 }
 
+func NewAccountFromMnemonicStandard(mnemonic, path, network string) (signing.AccountHandler, error) {
+	privateKey, err := key.DerivePrivateKeySR25519Standard(mnemonic, path)
+	if err != nil {
+		return nil, err
+	}
+	return NewAccountFromPrivateKey(privateKey, network)
+}
+
 func NewAccountFromPrivateKey(privateKey []byte, network string) (signing.AccountHandler, error) {
 	a := &Account{}
 	publicKey, err := key.PrivateKey2PublicKeySR25519(privateKey)

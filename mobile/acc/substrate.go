@@ -19,6 +19,14 @@ func NewSubstrateFromMnemonic(mnemonic, path, network string) (*SubstrateAccount
 	return &SubstrateAccount{in: acc.(*substrate.Account)}, nil
 }
 
+func NewSubstrateFromMnemonicStandard(mnemonic, path, network string) (*SubstrateAccount, error) {
+	acc, err := substrate.NewAccountFromMnemonicStandard(mnemonic, path, network)
+	if err != nil {
+		return nil, err
+	}
+	return &SubstrateAccount{in: acc.(*substrate.Account)}, nil
+}
+
 func (a *SubstrateAccount) PrivateKey() []byte {
 	return a.in.PrivateKey()
 }

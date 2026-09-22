@@ -43,6 +43,14 @@ func DerivePrivateKeyED25519(mnemonic, path string) ([]byte, error) {
 }
 
 func DerivePrivateKeySR25519(mnemonic, path string) ([]byte, error) {
+	return derivePrivateKeySR25519(mnemonic, path, substrateJunctionID)
+}
+
+func DerivePrivateKeySR25519Standard(mnemonic, path string) ([]byte, error) {
+	return derivePrivateKeySR25519(mnemonic, path, substrateJunctionIDStandard)
+}
+
+func derivePrivateKeySR25519(mnemonic, path string, junctionID func(string) []byte) ([]byte, error) {
 	if mnemonic == "" {
 		return nil, fmt.Errorf("mnemonic is required")
 	}
@@ -63,7 +71,7 @@ func DerivePrivateKeySR25519(mnemonic, path string) ([]byte, error) {
 		return keyBytes[:], nil
 	}
 
-	junctions, err := parseSubstratePath(path)
+	junctions, err := parseSubstratePath(path, junctionID)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +101,7 @@ func substrateHardDerive(ms *schnorrkel.MiniSecretKey, junctionID []byte) (*schn
 	return schnorrkel.NewMiniSecretKeyFromRaw(newMiniSecret)
 }
 
-func parseSubstratePath(path string) ([][]byte, error) {
+func parseSubstratePath(path string, junctionID func(string) []byte) ([][]byte, error) {
 	var junctions [][]byte
 	for path != "" {
 		if !strings.HasPrefix(path, "//") {
@@ -109,7 +117,7 @@ func parseSubstratePath(path string) ([][]byte, error) {
 			name = path[:end]
 			path = path[end:]
 		}
-		junctions = append(junctions, substrateJunctionID(name))
+		junctions = append(junctions, junctionID(name))
 	}
 	return junctions, nil
 }
@@ -127,4 +135,39 @@ func substrateJunctionID(name string) []byte {
 	}
 	copy(buf[:], b)
 	return buf[:]
+}
+
+func substrateJunctionIDStandard(name string) []byte {
+	var buf [32]byte
+	if n, err := strconv.ParseUint(name, 10, 64); err == nil {
+		binary.LittleEndian.PutUint64(buf[:8], n)
+		return buf[:]
+	}
+	encoded := append(scaleCompactLength(uint64(len(name))), name...)
+	if len(encoded) > len(buf) {
+		h := blake2b.Sum256(encoded)
+		return h[:]
+	}
+	copy(buf[:], encoded)
+	return buf[:]
+}
+
+func scaleCompactLength(n uint64) []byte {
+	switch {
+	case n < 1<<6:
+		return []byte{byte(n << 2)}
+	case n < 1<<14:
+		v := uint16(n<<2) | 0b01
+		return []byte{byte(v), byte(v >> 8)}
+	case n < 1<<30:
+		v := uint32(n<<2) | 0b10
+		return []byte{byte(v), byte(v >> 8), byte(v >> 16), byte(v >> 24)}
+	}
+	var le [8]byte
+	binary.LittleEndian.PutUint64(le[:], n)
+	size := 8
+	for size > 4 && le[size-1] == 0 {
+		size--
+	}
+	return append([]byte{byte((size-4)<<2) | 0b11}, le[:size]...)
 }
