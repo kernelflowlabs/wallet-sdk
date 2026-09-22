@@ -21,13 +21,17 @@ import (
 var _ chainrpc.BasicChainHandler = (*Handler)(nil)
 
 type Handler struct {
-	rpc *httpc.Request
+	rpc       *httpc.Request
+	submitRpc *httpc.Request
 }
 
 func NewHandler(rpcUrl string) (*Handler, error) {
 	h := &Handler{}
 	h.rpc = httpc.NewRequest(rpcUrl, map[string]string{
 		"Content-Type": "application/json",
+	})
+	h.submitRpc = httpc.NewRequest(rpcUrl, map[string]string{
+		"Content-Type": "application/x.aptos.signed_transaction+bcs",
 	})
 	return h, nil
 }
@@ -63,8 +67,7 @@ func (h *Handler) SendTx(ctx context.Context, signedHex string) (string, error) 
 	}
 	res := &RpcTx{}
 	path := "v1/transactions"
-	h.rpc.SetHeader("Content-Type", "application/x.aptos.signed_transaction+bcs")
-	err = h.rpc.PostWithOutEncoded(ctx, res, path, signedBytes)
+	err = h.submitRpc.PostWithOutEncoded(ctx, res, path, signedBytes)
 	if err != nil {
 		return "", fmt.Errorf("failed to post transactions, err=%v", err)
 	} else if res.Message != "" {
