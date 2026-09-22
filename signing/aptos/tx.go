@@ -221,7 +221,7 @@ type (
 		SenderPublicKey string `json:"senderPublicKey" validate:"required,hex_str"`
 		Recipient       string `json:"recipient" validate:"required,apt_addr"`
 		Amount          string `json:"amount,omitempty" validate:"omitempty,u64_gt0"`
-		Nonce           string `json:"nonce" validate:"required,u64_gt0"`
+		Nonce           string `json:"nonce" validate:"required,u64"`
 		GasPrice        string `json:"gasPrice" validate:"required,u64_gt0"`
 		GasLimit        string `json:"gasLimit" validate:"required,u64_gt0"`
 		*LedgerInfoParams
