@@ -19,23 +19,44 @@ func ValidAddress(address string) bool {
 		return true
 	}
 	parts := strings.Split(address, "::")
-	if len(parts) == 1 || len(parts) == 3 {
-		if len(parts[0]) != 66 {
-			return false
-		}
-		if len(address) != 66 || address[:2] != "0x" {
-			return false
-		}
-		for _, c := range address[2:] {
-			isValid := (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
-			if isValid {
-				return true
-			}
-		}
-	} else {
-		return false
+	switch len(parts) {
+	case 1:
+		return validHexAddress(parts[0])
+	case 3:
+		return validHexAddress(parts[0]) && validMoveIdentifier(parts[1]) && validMoveIdentifier(parts[2])
 	}
 	return false
+}
+
+func validHexAddress(address string) bool {
+	if !strings.HasPrefix(address, "0x") && !strings.HasPrefix(address, "0X") {
+		return false
+	}
+	digits := address[2:]
+	if len(digits) == 0 || len(digits) > 64 {
+		return false
+	}
+	for _, c := range digits {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') && (c < 'A' || c > 'F') {
+			return false
+		}
+	}
+	return true
+}
+
+func validMoveIdentifier(name string) bool {
+	if name == "" {
+		return false
+	}
+	for i, c := range name {
+		switch {
+		case c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'):
+		case i > 0 && c >= '0' && c <= '9':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func init() {
