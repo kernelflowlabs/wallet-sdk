@@ -143,7 +143,7 @@ func NewMnemonic(entropy []byte) (string, error) {
 
 func MnemonicToByteArray(mnemonic string, raw ...bool) ([]byte, error) {
 	var (
-		mnemonicSlice    = strings.Split(mnemonic, " ")
+		mnemonicSlice    = strings.Fields(mnemonic)
 		entropyBitSize   = len(mnemonicSlice) * 11
 		checksumBitSize  = entropyBitSize % 32
 		fullByteSize     = (entropyBitSize-checksumBitSize)/8 + 1
