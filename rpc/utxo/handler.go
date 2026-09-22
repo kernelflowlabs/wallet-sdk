@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net/http"
 	"net/url"
 	"os/exec"
 	"strconv"
@@ -329,7 +330,11 @@ func (h *Handler) getBlockByHash(ctx context.Context, blockHash string) (string,
 func (h *Handler) getTxTransferForBTC(ctx context.Context, hash string) ([]*chainrpc.Transfer, []*chainrpc.BalanceChange, error) {
 	path := "tx/" + hash
 	res := &ElectrsTxRes{}
-	err := h.scanApi.Get(ctx, res, path, nil)
+	scanApi, err := h.scan()
+	if err != nil {
+		return nil, nil, err
+	}
+	err = scanApi.Get(ctx, res, path, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get tx from Electrs, err=%v", err)
 	}
@@ -458,8 +463,12 @@ func (h *Handler) getTxStatusForDOGE(ctx context.Context, hash string) (*chainrp
 func (h *Handler) getByteFeeFromBlockcypher(ctx context.Context, chainName string) (string, error) {
 	h.bcLimit()
 	out := &BlockcypherFeeRes{}
-	path := "v1/" + strings.ToLower(chainName) + "/main?token=" + h.blockcypherToken
-	err := h.scanApi.Get(ctx, out, path, nil)
+	path := "v1/" + strings.ToLower(chainName) + "/main"
+	scanApi, err := h.scan()
+	if err != nil {
+		return "", err
+	}
+	err = scanApi.Get(ctx, out, path, h.blockcypherQuery())
 	if err != nil {
 		return "", fmt.Errorf("failed to get byteFee, err=%v", err)
 	} else if out == nil {
@@ -477,12 +486,16 @@ func (h *Handler) getByteFeeFromBlockcypher(ctx context.Context, chainName strin
 }
 func (h *Handler) getBalanceFromBlockcypher(ctx context.Context, chainName, address string) (string, error) {
 	h.bcLimit()
-	path := "v1/" + strings.ToLower(chainName) + "/main/addrs/" + address + "?token=" + h.blockcypherToken
+	path := "v1/" + strings.ToLower(chainName) + "/main/addrs/" + address
 	res := &BlockcypherUtxoRes{}
 
-	req := url.Values{}
+	req := h.blockcypherQuery()
 	req.Set("unspentOnly", "true")
-	err := h.scanApi.Get(ctx, res, path, nil)
+	scanApi, err := h.scan()
+	if err != nil {
+		return "", err
+	}
+	err = scanApi.Get(ctx, res, path, req)
 	if err != nil {
 		return "", fmt.Errorf("failed to get balance from blockcypher, err=%v", err)
 	} else if res == nil {
@@ -492,19 +505,20 @@ func (h *Handler) getBalanceFromBlockcypher(ctx context.Context, chainName, addr
 }
 func (h *Handler) getTxStatusFromBlockcypher(ctx context.Context, chainName, hash string) (*chainrpc.TxResult, error) {
 	h.bcLimit()
-	path := "v1/" + strings.ToLower(chainName) + "/main/txs/" + hash + "?token=" + h.blockcypherToken
+	path := "v1/" + strings.ToLower(chainName) + "/main/txs/" + hash
 	res := &BlockcypherTxRes{}
-	err := h.scanApi.Get(ctx, res, path, nil)
+	scanApi, err := h.scan()
+	if err != nil {
+		return nil, err
+	}
+	err = scanApi.Get(ctx, res, path, h.blockcypherQuery())
 	result := &chainrpc.TxResult{}
 	if err != nil {
-		errMsg := err.Error()
-		if strings.Contains(strings.ToLower(errMsg), "not found") ||
-			strings.Contains(errMsg, "404") ||
-			strings.Contains(errMsg, "500") {
+		if httpc.StatusCode(err) == http.StatusNotFound {
 			result.Status = signing.TxStatusPending
 			return result, nil
 		}
-		return nil, fmt.Errorf("failed to get hash status, err=%v", err)
+		return nil, fmt.Errorf("failed to get hash status, err=%w", err)
 	} else if res == nil {
 		return nil, fmt.Errorf("failed to get hash status, return nil")
 	} else if res.BlockHeight > 0 &&
@@ -521,12 +535,16 @@ func (h *Handler) getTxStatusFromBlockcypher(ctx context.Context, chainName, has
 }
 func (h *Handler) getUtxoFromBlockcypher(ctx context.Context, chainName, address string) (*signing.UtxoList, error) {
 	h.bcLimit()
-	path := "v1/" + strings.ToLower(chainName) + "/main/addrs/" + address + "?token=" + h.blockcypherToken
+	path := "v1/" + strings.ToLower(chainName) + "/main/addrs/" + address
 	res := &BlockcypherUtxoRes{}
 
-	req := url.Values{}
+	req := h.blockcypherQuery()
 	req.Set("unspentOnly", "true")
-	err := h.scanApi.Get(ctx, res, path, req)
+	scanApi, err := h.scan()
+	if err != nil {
+		return nil, err
+	}
+	err = scanApi.Get(ctx, res, path, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get utxo from blockcypher, err=%v", err)
 	} else if res == nil {
@@ -764,6 +782,21 @@ func (h *Handler) getUtxoFromBlockcypherByCurl(ctx context.Context, chainName, a
 
 	return utxoList, nil
 }
+func (h *Handler) scan() (*httpc.Request, error) {
+	if h.scanApi == nil {
+		return nil, fmt.Errorf("scan API URL is not configured")
+	}
+	return h.scanApi, nil
+}
+
+func (h *Handler) blockcypherQuery() url.Values {
+	query := url.Values{}
+	if h.blockcypherToken != "" {
+		query.Set("token", h.blockcypherToken)
+	}
+	return query
+}
+
 func (h *Handler) bcLimit() {
 	h.bcMu.Lock()
 	defer h.bcMu.Unlock()
