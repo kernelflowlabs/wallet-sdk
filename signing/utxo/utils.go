@@ -91,52 +91,52 @@ func ValidAddress(address, network string) bool {
 	return false
 }
 
-func ValidAddressForBTC(address string) bool {
+func decodeAddressForNet(address string, params *chaincfg.Params, allowSegwit bool) (btcutil.Address, error) {
+	addr, err := btcutil.DecodeAddress(address, params)
+	if err != nil {
+		return nil, err
+	}
+	if !addr.IsForNet(params) {
+		return nil, fmt.Errorf("address %s does not belong to this network", address)
+	}
+	switch addr.(type) {
+	case *btcutil.AddressPubKeyHash, *btcutil.AddressScriptHash:
+		return addr, nil
+	case *btcutil.AddressWitnessPubKeyHash, *btcutil.AddressWitnessScriptHash, *btcutil.AddressTaproot:
+		if allowSegwit {
+			return addr, nil
+		}
+	}
+	return nil, fmt.Errorf("unsupported address type %T for this network", addr)
+}
+
+func validAddressForNet(address string, params *chaincfg.Params, allowSegwit bool) bool {
 	if address == signing.MagicContactAddressForNative {
 		return true
 	}
-	_, err := btcutil.DecodeAddress(address, &btcParams)
-	if err == nil {
-		return true
-	}
-	return false
+	_, err := decodeAddressForNet(address, params, allowSegwit)
+	return err == nil
+}
+
+func ValidAddressForBTC(address string) bool {
+	return validAddressForNet(address, &btcParams, true)
 }
 
 func ValidAddressForLTC(address string) bool {
-	if address == signing.MagicContactAddressForNative {
-		return true
-	}
-	_, err := btcutil.DecodeAddress(address, &ltcParams)
-	if err == nil {
-		return true
-	}
-	return false
+	return validAddressForNet(address, &ltcParams, true)
 }
 
 func ValidAddressForDOGE(address string) bool {
-	if address == signing.MagicContactAddressForNative {
-		return true
-	}
-	_, err := btcutil.DecodeAddress(address, &dogeParams)
-	if err == nil {
-		return true
-	}
-	return false
+	return validAddressForNet(address, &dogeParams, false)
 }
 
 func ValidAddressForSYS(address string) bool {
-	if address == signing.MagicContactAddressForNative {
-		return true
-	}
-	_, err := btcutil.DecodeAddress(address, &sysParams)
-	if err == nil {
-		return true
-	}
-	return false
+	return validAddressForNet(address, &sysParams, true)
 }
 
 func AddressToScriptPubKey(address string, network string) (string, error) {
 	var params *chaincfg.Params
+	allowSegwit := true
 
 	switch network {
 	case NetworkEnumForBTC, NetworkEnumForBTCP2TR:
@@ -145,11 +145,12 @@ func AddressToScriptPubKey(address string, network string) (string, error) {
 		params = &ltcParams
 	case NetworkEnumForDOGE:
 		params = &dogeParams
+		allowSegwit = false
 	default:
 		return "", fmt.Errorf("unsupported network")
 	}
 
-	addr, err := btcutil.DecodeAddress(address, params)
+	addr, err := decodeAddressForNet(address, params, allowSegwit)
 	if err != nil {
 		return "", fmt.Errorf("invalid address: %v", err)
 	}
