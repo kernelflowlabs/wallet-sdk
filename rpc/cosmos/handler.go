@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/kernelflowlabs/wallet-sdk/common/httpc"
@@ -191,10 +192,11 @@ func (h *Handler) CheckTx(ctx context.Context, hash string) (*chainrpc.TxResult,
 	out := &GetTxRes{}
 	path := "cosmos/tx/v1beta1/txs/" + hash
 	err := h.rpc.Get(ctx, out, path, nil)
-	if err != nil {
-		return nil, fmt.Errorf("fail to get tx, err=%v", err)
-	} else if out.Code != 0 {
-		if strings.Contains(out.Message, "key not found") ||
+	notFound := httpc.StatusCode(err) == http.StatusNotFound
+	if err != nil && !notFound {
+		return nil, fmt.Errorf("fail to get tx, err=%w", err)
+	} else if notFound || out.Code != 0 {
+		if notFound || strings.Contains(out.Message, "key not found") ||
 			strings.Contains(out.Message, "tx not found") {
 			result.Status = signing.TxStatusPending
 			return result, nil
@@ -223,10 +225,11 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 		out := &GetAccInfoRes{}
 		path := "cosmos/auth/v1beta1/accounts/" + params
 		err := h.rpc.Get(ctx, out, path, nil)
-		if err != nil {
-			return "", fmt.Errorf("fail to get account info, err=%v", err)
-		} else if out.Code != 0 {
-			if strings.Contains(out.Message, "key not found") {
+		notFound := httpc.StatusCode(err) == http.StatusNotFound
+		if err != nil && !notFound {
+			return "", fmt.Errorf("fail to get account info, err=%w", err)
+		} else if notFound || out.Code != 0 {
+			if notFound || strings.Contains(out.Message, "key not found") {
 				result.AccountNumber = "0"
 				result.Sequence = "0"
 				resultBytes, err := json.Marshal(result)

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
@@ -335,8 +336,10 @@ func isUTXOSpendable(entry *appmessage.UTXOsByAddressesEntry, virtualSelectedPar
 func getNativeTx(ctx context.Context, api *httpc.Request, hash string) (*KasScanGetTransactionRes, bool, error) {
 	out := &KasScanGetTransactionRes{}
 	err := api.Get(ctx, out, "transactions/"+hash, nil)
-	if err != nil {
-		return nil, false, fmt.Errorf("failed to get transactions, hash=%s, err=%v", hash, err)
+	if httpc.StatusCode(err) == http.StatusNotFound {
+		return nil, true, nil
+	} else if err != nil {
+		return nil, false, fmt.Errorf("failed to get transactions, hash=%s, err=%w", hash, err)
 	} else if out.Detail != "" {
 		if strings.Contains(out.Detail, "Transaction not found") {
 			return nil, true, nil

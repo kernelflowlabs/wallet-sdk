@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -92,6 +93,9 @@ func (h *Handler) CheckTx(ctx context.Context, hash string) (*chainrpc.TxResult,
 	res := &ApiTransaction{}
 	err := h.api.Get(ctx, res, path, nil)
 	if err != nil {
+		if httpc.StatusCode(err) != http.StatusNotFound {
+			return nil, fmt.Errorf("fail to get transaction, err=%w", err)
+		}
 		result.Status = signing.TxStatusPending
 		return result, nil
 	} else if res.Error != "" {
@@ -131,19 +135,32 @@ func (h *Handler) CheckTx(ctx context.Context, hash string) (*chainrpc.TxResult,
 		}
 	}
 
-	inMsgHashStatus, err := h.getHashStatus(ctx, inMsg.Hash, "in")
-	if err != nil {
-		if strings.Contains(err.Error(), "entity not found") {
-			result.Status = signing.TxStatusPending
-			return result, nil
+	msgStatus := func(msgHash, typeSel string) (bool, bool, error) {
+		if msgHash == "" {
+			return false, false, nil
 		}
+		ok, err := h.getHashStatus(ctx, msgHash, typeSel)
+		if err == nil {
+			return ok, false, nil
+		}
+		if httpc.StatusCode(err) == http.StatusNotFound || strings.Contains(err.Error(), "entity not found") {
+			return false, true, nil
+		}
+		return false, false, err
 	}
-	outMsgHashStatus, err := h.getHashStatus(ctx, outMsg.Hash, "out")
+	inMsgHashStatus, pending, err := msgStatus(inMsg.Hash, "in")
 	if err != nil {
-		if strings.Contains(err.Error(), "entity not found") {
-			result.Status = signing.TxStatusPending
-			return result, nil
-		}
+		return nil, fmt.Errorf("fail to check inbound message, err=%w", err)
+	} else if pending {
+		result.Status = signing.TxStatusPending
+		return result, nil
+	}
+	outMsgHashStatus, pending, err := msgStatus(outMsg.Hash, "out")
+	if err != nil {
+		return nil, fmt.Errorf("fail to check outbound message, err=%w", err)
+	} else if pending {
+		result.Status = signing.TxStatusPending
+		return result, nil
 	}
 
 	if inMsgHashStatus && outMsgHashStatus {
@@ -402,13 +419,13 @@ func (h *Handler) getHashStatus(ctx context.Context, hash, typeSel string) (bool
 		res := &ApiTransaction{}
 		err := h.api.Get(ctx, res, path, nil)
 		if err != nil {
-			return false, fmt.Errorf("fail to getHashStatus, err=%v", err)
+			return false, fmt.Errorf("fail to getHashStatus, err=%w", err)
 		} else if res.Error != "" {
 			return false, fmt.Errorf("fail to getHashStatus res.Error, err=%v", res.Error)
 		} else if len(res.OutMsgs) == 0 && inrcm > 0 {
 			return true, nil
 		} else if !res.Success {
-			return false, fmt.Errorf("fail to getHashStatus !res.Success")
+			return false, nil
 		}
 		inrcm++
 		var inMsg InMsgDetails

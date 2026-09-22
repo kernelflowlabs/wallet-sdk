@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -77,7 +78,8 @@ func (h *Handler) CheckTx(ctx context.Context, hash string) (*chainrpc.TxResult,
 
 	tx, err := h.getTransactionByHash(ctx, hash)
 	if err != nil {
-		if strings.Contains(err.Error(), "Transaction not found by Transaction hash") {
+		if httpc.StatusCode(err) == http.StatusNotFound ||
+			strings.Contains(err.Error(), "Transaction not found by Transaction hash") {
 			r.Status = signing.TxStatusPending
 			return r, nil
 		}
@@ -114,8 +116,10 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 		res := &AccountCoreRes{}
 		path := "v1/accounts/" + params
 		err := h.rpc.Get(ctx, res, path, nil)
-		if err != nil {
-			return "", fmt.Errorf("failed to get accounts, err=%v", err)
+		if httpc.StatusCode(err) == http.StatusNotFound {
+			return "0", nil
+		} else if err != nil {
+			return "", fmt.Errorf("failed to get accounts, err=%w", err)
 		} else if res.Message != "" {
 			return "", fmt.Errorf("failed to get accounts, err=Msg%v", res.Message)
 		}
@@ -188,7 +192,7 @@ func (h *Handler) getTransactionByHash(ctx context.Context, hash string) (*RpcTx
 	path := "v1/transactions/by_hash/" + hash
 	err := h.rpc.Get(ctx, out, path, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get transaction by hash, err=%v", err)
+		return nil, fmt.Errorf("failed to get transaction by hash, err=%w", err)
 	} else if out.Message != "" {
 		return nil, fmt.Errorf("failed to get transaction by hash, errMsg=%v", out.Message)
 	}
@@ -200,7 +204,8 @@ func (h *Handler) getCoinBalance(ctx context.Context, address, coinType string) 
 	path := "v1/accounts/" + address + "/balance/" + coinType
 	err := h.rpc.GetRaw(ctx, &buf, path, nil)
 	if err != nil {
-		if strings.Contains(err.Error(), "Resource not found") ||
+		if httpc.StatusCode(err) == http.StatusNotFound ||
+			strings.Contains(err.Error(), "Resource not found") ||
 			strings.Contains(err.Error(), "resource_not_found") {
 			return "0", nil
 		}

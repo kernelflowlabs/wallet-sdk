@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -146,7 +147,8 @@ func (h *Handler) CheckTx(ctx context.Context, hash string) (*chainrpc.TxResult,
 	r := &chainrpc.TxResult{}
 	tx, err := h.checkTransactionById(ctx, hash)
 	if err != nil {
-		if strings.Contains(err.Error(), "could not find the transaction") {
+		if httpc.StatusCode(err) == http.StatusNotFound ||
+			strings.Contains(err.Error(), "could not find the transaction") {
 			r.Status = signing.TxStatusPending
 			return r, nil
 		}
@@ -258,7 +260,7 @@ func (h *Handler) checkTransactionById(ctx context.Context, txID string) (*Pendi
 	out := &PendingTransactionResponse{}
 	err := h.rpc.Get(ctx, out, "v2/transactions/pending/"+txID, nil)
 	if err != nil {
-		return nil, fmt.Errorf("fail to get pending tx, err=%v", err)
+		return nil, fmt.Errorf("fail to get pending tx, err=%w", err)
 	} else if out.Message != "" {
 		return nil, fmt.Errorf("fail to get pending tx, errMsg=%v", out.Message)
 	}
