@@ -181,7 +181,7 @@ func (h *Handler) GetAddressFee(ctx context.Context, address string) (wallettron
 	if err != nil {
 		return res, fmt.Errorf("failed to getAccountResource, err=%v", err)
 	}
-	res.FreeNetUsed = strconv.FormatInt(ar.FreeNetLimit, 10)
+	res.FreeNetUsed = strconv.FormatInt(ar.FreeNetUsed, 10)
 	res.FreeNetLimit = strconv.FormatInt(ar.FreeNetLimit, 10)
 	return res, nil
 }
@@ -267,9 +267,9 @@ func (h *Handler) CallContract(ctx context.Context, contractAddress, params, blo
 func (h *Handler) InquireChain(ctx context.Context, instruction, params string) (string, error) {
 	switch instruction {
 	case "getRefInfo":
-		var blockHeight string
+		blockHeight := params
 		var err error
-		if params == "" {
+		if blockHeight == "" {
 			blockHeight, err = h.GetHeight(ctx)
 			if err != nil {
 				return "", err
@@ -292,7 +292,7 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 		if err != nil {
 			return "", fmt.Errorf("failed to getAccountResource, err=%v", err)
 		}
-		res.FreeNetUsed = strconv.FormatInt(ar.FreeNetLimit, 10)
+		res.FreeNetUsed = strconv.FormatInt(ar.FreeNetUsed, 10)
 		res.FreeNetLimit = strconv.FormatInt(ar.FreeNetLimit, 10)
 		resBytes, err := json.Marshal(res)
 		if err != nil {
@@ -344,7 +344,10 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 		} else if out.Result.Result == false {
 			return "", fmt.Errorf("get Result==false")
 		}
-		r := parseContractNumber(out.ConstantResult[0])
+		r, err := parseContractNumber(out.ConstantResult)
+		if err != nil {
+			return "", fmt.Errorf("failed to getAllowance, err=%w", err)
+		}
 		return r.String(), nil
 	case "getTokenDecimals":
 		if params == signing.MagicContactAddressForNative {
@@ -367,7 +370,10 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 		} else if out.Result.Result == false {
 			return "", fmt.Errorf("get Result==false")
 		}
-		r := parseContractNumber(out.ConstantResult[0])
+		r, err := parseContractNumber(out.ConstantResult)
+		if err != nil {
+			return "", fmt.Errorf("failed to getTokenDecimals, err=%w", err)
+		}
 		return r.String(), nil
 	}
 	return "", fmt.Errorf("unsupported function")
@@ -407,7 +413,10 @@ func (h *Handler) getTokenBalance(ctx context.Context, address string, contract 
 	} else if out.Result.Result == false {
 		return nil, fmt.Errorf("get Result==false")
 	}
-	r := parseContractNumber(out.ConstantResult[0])
+	r, err := parseContractNumber(out.ConstantResult)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse balance, err=%w", err)
+	}
 	return r, nil
 }
 func (h *Handler) getBlockByNumber(ctx context.Context, num uint64) (*Block, error) {
@@ -434,13 +443,17 @@ func (h *Handler) getAccountResource(ctx context.Context, address string) (*GetA
 	}
 	return out, nil
 }
-func parseContractNumber(data string) *big.Int {
-	if len(strings.TrimPrefix(data, "0x")) == 64 {
-		var n big.Int
-		_, ok := n.SetString(data, 16)
-		if ok {
-			return &n
-		}
+func parseContractNumber(results []string) (*big.Int, error) {
+	if len(results) == 0 {
+		return nil, fmt.Errorf("empty constant_result")
 	}
-	return nil
+	data := strings.TrimPrefix(results[0], "0x")
+	if len(data) != 64 {
+		return nil, fmt.Errorf("unexpected constant_result %q", results[0])
+	}
+	n, ok := new(big.Int).SetString(data, 16)
+	if !ok {
+		return nil, fmt.Errorf("invalid constant_result %q", results[0])
+	}
+	return n, nil
 }
