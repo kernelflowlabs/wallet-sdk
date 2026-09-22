@@ -735,7 +735,35 @@ func (h *Handler) getTxTransferForEVMFromContract(tx *RpcTransaction, receipt *R
 		updateBalanceMap(balanceMap, recipient, contractAddr, amountBig)
 	}
 
-	if tx.Value != "" && tx.Value != "0x" && tx.Value != "0x0" {
+	rootTraced := false
+	failedFrames := make(map[string]bool)
+	for _, itx := range internalTxs {
+		if itx.TraceAddress == nil {
+			continue
+		}
+		if len(itx.TraceAddress) == 0 {
+			rootTraced = true
+		}
+		if itx.Error != "" {
+			failedFrames[fmt.Sprint(itx.TraceAddress)] = true
+		}
+	}
+	inFailedFrame := func(itx *RpcInternalTx) bool {
+		if itx.Error != "" {
+			return true
+		}
+		if itx.TraceAddress == nil {
+			return false
+		}
+		for i := 0; i <= len(itx.TraceAddress); i++ {
+			if failedFrames[fmt.Sprint(itx.TraceAddress[:i])] {
+				return true
+			}
+		}
+		return false
+	}
+
+	if !rootTraced && tx.Value != "" && tx.Value != "0x" && tx.Value != "0x0" {
 		valueBig, ok := new(big.Int).SetString(strings.TrimPrefix(tx.Value, "0x"), 16)
 		if ok && valueBig.Cmp(big.NewInt(0)) > 0 {
 			transferList = append(transferList, &chainrpc.Transfer{
@@ -754,12 +782,11 @@ func (h *Handler) getTxTransferForEVMFromContract(tx *RpcTransaction, receipt *R
 		internalNativeMap := make(map[string]map[string]*big.Int) // from -> (to -> amount)
 
 		for _, itx := range internalTxs {
-			if itx.Action == nil {
+			if itx.Action == nil || inFailedFrame(itx) {
 				continue
 			}
 
-			callType := itx.Action.CallType
-			if callType != "call" && callType != "staticcall" && callType != "delegatecall" {
+			if itx.Action.CallType != "call" {
 				continue
 			}
 

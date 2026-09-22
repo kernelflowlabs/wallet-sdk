@@ -37,7 +37,9 @@ type (
 			GasUsed string `json:"gasUsed"`
 			Output  string `json:"output"`
 		} `json:"result"`
-		Type string `json:"type"`
+		Type         string `json:"type"`
+		Error        string `json:"error,omitempty"`
+		TraceAddress []int  `json:"traceAddress"`
 	}
 	RpcBlock struct {
 		RpcBlockHeader `json:"blockHeader"`
