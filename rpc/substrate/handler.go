@@ -106,6 +106,10 @@ func (h *Handler) CallContract(ctx context.Context, contractAddress, params, blo
 func (h *Handler) InquireChain(ctx context.Context, instruction, params string) (string, error) {
 	switch instruction {
 	case "getNonce":
+		var nextIndex types.U32
+		if err := h.rpc.Client.Call(&nextIndex, "system_accountNextIndex", params); err == nil {
+			return strconv.FormatUint(uint64(nextIndex), 10), nil
+		}
 		meta, err := h.rpc.RPC.State.GetMetadataLatest()
 		if err != nil {
 			return "", fmt.Errorf("failed to GetMetadataLatest,err=%v", err)
