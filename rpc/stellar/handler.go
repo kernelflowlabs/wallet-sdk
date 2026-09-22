@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -177,6 +178,9 @@ func (h *Handler) CheckTx(ctx context.Context, hash string) (*chainrpc.TxResult,
 	r := &chainrpc.TxResult{}
 	tx, err := h.getTransactionById(ctx, hash)
 	if err != nil {
+		if httpc.StatusCode(err) != http.StatusNotFound {
+			return nil, fmt.Errorf("fail to get transaction, err=%w", err)
+		}
 		r.Status = signing.TxStatusPending
 	} else if tx.Successful {
 		r.Height = strconv.FormatInt(int64(tx.Ledger), 10)
@@ -216,7 +220,9 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 func (h *Handler) getAccountInfo(ctx context.Context, address string) (*AccountRes, error) {
 	res := &AccountRes{}
 	err := h.rpc.Get(ctx, res, "accounts/"+address, nil)
-	if err != nil {
+	if httpc.StatusCode(err) == http.StatusNotFound {
+		return nil, fmt.Errorf("account not activated")
+	} else if err != nil {
 		return nil, err
 	} else if res.Status != 0 {
 		if res.Title == "Resource Missing" && res.Status == 404 {
