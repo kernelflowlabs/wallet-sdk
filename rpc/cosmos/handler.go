@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/kernelflowlabs/wallet-sdk/common/httpc"
@@ -103,15 +102,14 @@ func (h *Handler) GetTransfersByHash(ctx context.Context, hash string, confirmat
 		return r, nil
 	}
 
-	height, _ := strconv.ParseUint(txResult.Height, 10, 64)
-	latestHeightStr, _ := h.GetHeight(ctx)
-	latestHeight, _ := strconv.ParseUint(latestHeightStr, 10, 64)
-	if height != 0 && latestHeight != 0 {
-		if latestHeight-height < confirmation {
-			r.ErrMsg = fmt.Sprintf("tx succeeded.But current confirmation number %d hasn't meet "+
-				"expected number %d", latestHeight-height, confirmation)
-			return r, nil
-		}
+	confirmed, err := chainrpc.Confirmations(ctx, txResult.Height, confirmation, h.GetHeight)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check confirmations, err=%w", err)
+	}
+	if confirmed < confirmation {
+		r.ErrMsg = fmt.Sprintf("tx succeeded.But current confirmation number %d hasn't meet "+
+			"expected number %d", confirmed, confirmation)
+		return r, nil
 	}
 
 	demon := walletcosmos.Denom(h.network)
