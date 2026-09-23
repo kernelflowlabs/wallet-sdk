@@ -163,3 +163,22 @@ type (
 		} `json:"txn"`
 	}
 )
+
+type IndexerTransactionRes struct {
+	Message     string `json:"message,omitempty"`
+	Transaction struct {
+		Sender             string `json:"sender"`
+		TxType             string `json:"tx-type"`
+		ConfirmedRound     uint64 `json:"confirmed-round"`
+		Fee                uint64 `json:"fee"`
+		PaymentTransaction struct {
+			Amount   uint64 `json:"amount"`
+			Receiver string `json:"receiver"`
+		} `json:"payment-transaction"`
+		AssetTransferTransaction struct {
+			Amount   uint64 `json:"amount"`
+			AssetID  uint64 `json:"asset-id"`
+			Receiver string `json:"receiver"`
+		} `json:"asset-transfer-transaction"`
+	} `json:"transaction"`
+}

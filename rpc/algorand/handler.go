@@ -18,22 +18,38 @@ import (
 var _ chainrpc.BasicChainHandler = (*Handler)(nil)
 
 type Handler struct {
-	rpc *httpc.Request
+	rpc     *httpc.Request
+	indexer *httpc.Request
+}
+
+func newAlgodRequest(url string) (*httpc.Request, error) {
+	tmp := strings.Split(url, "@")
+	headers := map[string]string{"Content-Type": "application/json"}
+	switch len(tmp) {
+	case 1:
+	case 2:
+		headers["X-Algo-API-Token"] = tmp[1]
+	default:
+		return nil, fmt.Errorf("invalid params")
+	}
+	return httpc.NewRequest(tmp[0], headers), nil
 }
 
 func NewHandler(rpcUrl string) (*Handler, error) {
-	rpcBase := ""
-	tmp := strings.Split(rpcUrl, "@")
-	headers := map[string]string{"Content-Type": "application/json"}
-	if len(tmp) == 1 {
-		rpcBase = tmp[0]
-	} else if len(tmp) == 2 {
-		rpcBase = tmp[0]
-		headers["X-Algo-API-Token"] = tmp[1]
-	} else {
-		return nil, fmt.Errorf("invalid params")
+	parts := strings.SplitN(rpcUrl, ";", 2)
+	rpc, err := newAlgodRequest(parts[0])
+	if err != nil {
+		return nil, err
 	}
-	return &Handler{rpc: httpc.NewRequest(rpcBase, headers)}, nil
+	h := &Handler{rpc: rpc}
+	if len(parts) == 2 && strings.TrimSpace(parts[1]) != "" {
+		indexer, err := newAlgodRequest(strings.TrimSpace(parts[1]))
+		if err != nil {
+			return nil, err
+		}
+		h.indexer = indexer
+	}
+	return h, nil
 }
 
 func (h *Handler) GetHeight(ctx context.Context) (string, error) {
@@ -260,9 +276,33 @@ func (h *Handler) checkTransactionById(ctx context.Context, txID string) (*Pendi
 	out := &PendingTransactionResponse{}
 	err := h.rpc.Get(ctx, out, "v2/transactions/pending/"+txID, nil)
 	if err != nil {
+		if httpc.StatusCode(err) == http.StatusNotFound && h.indexer != nil {
+			return h.lookupInIndexer(ctx, txID)
+		}
 		return nil, fmt.Errorf("fail to get pending tx, err=%w", err)
 	} else if out.Message != "" {
 		return nil, fmt.Errorf("fail to get pending tx, errMsg=%v", out.Message)
 	}
+	return out, nil
+}
+
+func (h *Handler) lookupInIndexer(ctx context.Context, txID string) (*PendingTransactionResponse, error) {
+	res := &IndexerTransactionRes{}
+	if err := h.indexer.Get(ctx, res, "v2/transactions/"+txID, nil); err != nil {
+		return nil, fmt.Errorf("fail to get tx from indexer, err=%w", err)
+	}
+	if res.Message != "" {
+		return nil, fmt.Errorf("fail to get tx from indexer, errMsg=%v", res.Message)
+	}
+	tx := res.Transaction
+	out := &PendingTransactionResponse{ConfirmedRound: tx.ConfirmedRound}
+	out.Txn.Txn.Type = tx.TxType
+	out.Txn.Txn.Snd = tx.Sender
+	out.Txn.Txn.Fee = tx.Fee
+	out.Txn.Txn.Rcv = tx.PaymentTransaction.Receiver
+	out.Txn.Txn.Amt = tx.PaymentTransaction.Amount
+	out.Txn.Txn.Arcv = tx.AssetTransferTransaction.Receiver
+	out.Txn.Txn.Aamt = tx.AssetTransferTransaction.Amount
+	out.Txn.Txn.Xaid = tx.AssetTransferTransaction.AssetID
 	return out, nil
 }
