@@ -4,12 +4,10 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
 	"net/url"
-	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -28,6 +26,7 @@ var _ chainrpc.BasicChainHandler = (*Handler)(nil)
 type Handler struct {
 	rpc              *httpc.Request
 	scanApi          *httpc.Request
+	dogeApi          *httpc.Request
 	network          string
 	blockcypherToken string
 	bcMu             sync.Mutex
@@ -36,7 +35,7 @@ type Handler struct {
 
 func NewHandler(url, network, blockcypherToken string) (*Handler, error) {
 	if network == walletutxo.NetworkEnumForSYS {
-		h := &Handler{blockcypherToken: blockcypherToken}
+		h := &Handler{blockcypherToken: blockcypherToken, dogeApi: newBlockcypherRequest()}
 		rpc := httpc.NewRequest(url, map[string]string{
 			"content-type": "text/plain",
 		})
@@ -77,7 +76,7 @@ func NewHandler(url, network, blockcypherToken string) (*Handler, error) {
 		rpcBase = rpcPart
 	}
 
-	h := &Handler{blockcypherToken: blockcypherToken}
+	h := &Handler{blockcypherToken: blockcypherToken, dogeApi: newBlockcypherRequest()}
 
 	rpcHeaders := map[string]string{
 		"content-type": "text/plain",
@@ -98,6 +97,12 @@ func NewHandler(url, network, blockcypherToken string) (*Handler, error) {
 
 	h.network = network
 	return h, nil
+}
+
+func newBlockcypherRequest() *httpc.Request {
+	return httpc.NewRequest("https://api.blockcypher.com", map[string]string{
+		"User-Agent": "curl/7.81.0",
+	})
 }
 
 func (h *Handler) GetHeight(ctx context.Context) (string, error) {
@@ -448,23 +453,23 @@ func (h *Handler) getTxStatusForLTC(ctx context.Context, hash string) (*chainrpc
 }
 
 func (h *Handler) getByteFeeForDOGE(ctx context.Context) (string, error) {
-	return h.getByteFeeFromBlockcypherByCurl(ctx, "DOGE")
+	return h.getByteFeeFromBlockcypher(ctx, "DOGE")
 }
 func (h *Handler) getBalanceForDOGE(ctx context.Context, address string) (string, error) {
-	return h.getBalanceFromBlockcypherByCurl(ctx, "DOGE", address)
+	return h.getBalanceFromBlockcypher(ctx, "DOGE", address)
 }
 func (h *Handler) getUtxoForDOGE(ctx context.Context, address string) (*signing.UtxoList, error) {
-	return h.getUtxoFromBlockcypherByCurl(ctx, "DOGE", address)
+	return h.getUtxoFromBlockcypher(ctx, "DOGE", address)
 }
 func (h *Handler) getTxStatusForDOGE(ctx context.Context, hash string) (*chainrpc.TxResult, error) {
-	return h.getTxStatusFromBlockcypherByCurl(ctx, "DOGE", hash)
+	return h.getTxStatusFromBlockcypher(ctx, "DOGE", hash)
 }
 
 func (h *Handler) getByteFeeFromBlockcypher(ctx context.Context, chainName string) (string, error) {
 	h.bcLimit()
 	out := &BlockcypherFeeRes{}
 	path := "v1/" + strings.ToLower(chainName) + "/main"
-	scanApi, err := h.scan()
+	scanApi, err := h.blockcypher(chainName)
 	if err != nil {
 		return "", err
 	}
@@ -491,7 +496,7 @@ func (h *Handler) getBalanceFromBlockcypher(ctx context.Context, chainName, addr
 
 	req := h.blockcypherQuery()
 	req.Set("unspentOnly", "true")
-	scanApi, err := h.scan()
+	scanApi, err := h.blockcypher(chainName)
 	if err != nil {
 		return "", err
 	}
@@ -507,7 +512,7 @@ func (h *Handler) getTxStatusFromBlockcypher(ctx context.Context, chainName, has
 	h.bcLimit()
 	path := "v1/" + strings.ToLower(chainName) + "/main/txs/" + hash
 	res := &BlockcypherTxRes{}
-	scanApi, err := h.scan()
+	scanApi, err := h.blockcypher(chainName)
 	if err != nil {
 		return nil, err
 	}
@@ -540,7 +545,7 @@ func (h *Handler) getUtxoFromBlockcypher(ctx context.Context, chainName, address
 
 	req := h.blockcypherQuery()
 	req.Set("unspentOnly", "true")
-	scanApi, err := h.scan()
+	scanApi, err := h.blockcypher(chainName)
 	if err != nil {
 		return nil, err
 	}
@@ -561,6 +566,8 @@ func (h *Handler) getUtxoFromBlockcypher(ctx context.Context, chainName, address
 			continue
 		} else if v.Confirmations == 0 {
 			continue
+		} else if network == walletutxo.NetworkEnumForDOGE && v.Value <= walletutxo.DogeDust {
+			continue
 		}
 		pubKeyScript, err := walletutxo.AddressToScriptPubKey(address, network)
 		if err != nil {
@@ -574,212 +581,6 @@ func (h *Handler) getUtxoFromBlockcypher(ctx context.Context, chainName, address
 		}
 		utxoList.List = append(utxoList.List, utxo)
 	}
-	return utxoList, nil
-}
-func (h *Handler) getByteFeeFromBlockcypherByCurl(ctx context.Context, chainName string) (string, error) {
-	h.bcLimit()
-	url := fmt.Sprintf("https://api.blockcypher.com/v1/%s/main?token=%s",
-		strings.ToLower(chainName),
-		h.blockcypherToken)
-	cmd := exec.CommandContext(ctx, "curl",
-		"-s",
-		"-H", "User-Agent: curl/7.81.0",
-		url)
-
-	output, err := cmd.Output()
-	if err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			return "", fmt.Errorf("failed to get byteFee via curl, err=%v, stderr=%s",
-				err, string(exitErr.Stderr))
-		}
-		return "", fmt.Errorf("failed to get byteFee via curl, err=%v", err)
-	}
-	if len(output) == 0 {
-		return "", fmt.Errorf("failed to get byteFee, empty response")
-	}
-	if strings.Contains(string(output), "error") || strings.Contains(string(output), "Limits reached") {
-		return "", fmt.Errorf("failed to get byteFee, api error: %s", string(output))
-	}
-	out := &BlockcypherFeeRes{}
-	if err := json.Unmarshal(output, out); err != nil {
-		return "", fmt.Errorf("failed to parse byteFee response, err=%v, output=%s",
-			err, string(output))
-	}
-	feePerByte := float64(1)
-	if out.MediumFeePerKb != 0 {
-		feePerByte = out.MediumFeePerKb / 1000
-	} else if out.HighFeePerKb != 0 {
-		feePerByte = out.HighFeePerKb / 1000
-	} else if out.LowFeePerKb != 0 {
-		feePerByte = out.LowFeePerKb / 1000
-	}
-
-	return decimal.NewFromFloat(feePerByte).Ceil().String(), nil
-}
-func (h *Handler) getBalanceFromBlockcypherByCurl(ctx context.Context, chainName, address string) (string, error) {
-	h.bcLimit()
-
-	url := fmt.Sprintf("https://api.blockcypher.com/v1/%s/main/addrs/%s?token=%s&unspentOnly=true",
-		strings.ToLower(chainName),
-		address,
-		h.blockcypherToken)
-
-	cmd := exec.CommandContext(ctx, "curl", "-s", "-H", "User-Agent: curl/7.81.0", url)
-	output, err := cmd.Output()
-	if err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			return "", fmt.Errorf("failed to get balance from blockcypher, err=%v, stderr=%s",
-				err, string(exitErr.Stderr))
-		}
-		return "", fmt.Errorf("failed to get balance from blockcypher, err=%v", err)
-	}
-
-	if len(output) == 0 {
-		return "", fmt.Errorf("failed to get balance from blockcypher, empty response")
-	}
-
-	if strings.Contains(string(output), "\"error\"") {
-		return "", fmt.Errorf("failed to get balance from blockcypher, api error: %s", string(output))
-	}
-
-	res := &BlockcypherUtxoRes{}
-	if err := json.Unmarshal(output, res); err != nil {
-		return "", fmt.Errorf("failed to parse balance response, err=%v, output=%s",
-			err, string(output))
-	}
-
-	if res == nil {
-		return "", fmt.Errorf("failed to get balance from blockcypher, return is nil")
-	}
-
-	return strconv.FormatInt(res.FinalBalance, 10), nil
-}
-func (h *Handler) getTxStatusFromBlockcypherByCurl(ctx context.Context, chainName, hash string) (*chainrpc.TxResult, error) {
-	h.bcLimit()
-
-	url := fmt.Sprintf("https://api.blockcypher.com/v1/%s/main/txs/%s?token=%s",
-		strings.ToLower(chainName),
-		hash,
-		h.blockcypherToken)
-
-	cmd := exec.CommandContext(ctx, "curl", "-s", "-H", "User-Agent: curl/7.81.0", url)
-	output, err := cmd.Output()
-
-	result := &chainrpc.TxResult{}
-
-	if err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			errMsg := string(exitErr.Stderr)
-			if strings.Contains(strings.ToLower(errMsg), "not found") {
-				result.Status = signing.TxStatusPending
-				return result, nil
-			}
-		}
-		return nil, fmt.Errorf("failed to get hash status, err=%v", err)
-	}
-
-	if len(output) == 0 {
-		result.Status = signing.TxStatusPending
-		return result, nil
-	}
-
-	outputStr := string(output)
-	if strings.Contains(outputStr, "not found") ||
-		strings.Contains(outputStr, "\"error\"") {
-		result.Status = signing.TxStatusPending
-		return result, nil
-	}
-
-	res := &BlockcypherTxRes{}
-	if err := json.Unmarshal(output, res); err != nil {
-		return nil, fmt.Errorf("failed to parse tx status response, err=%v", err)
-	}
-
-	if res == nil {
-		return nil, fmt.Errorf("failed to get hash status, return nil")
-	}
-
-	if res.BlockHeight > 0 &&
-		res.DoubleSpend == false &&
-		res.Confirmations > 0 &&
-		res.Confidence == 1 {
-		result.Status = signing.TxStatusSucceeded
-		result.Height = strconv.FormatInt(res.BlockHeight, 10)
-		return result, nil
-	}
-
-	result.Status = signing.TxStatusPending
-	return result, nil
-}
-func (h *Handler) getUtxoFromBlockcypherByCurl(ctx context.Context, chainName, address string) (*signing.UtxoList, error) {
-	h.bcLimit()
-
-	url := fmt.Sprintf("https://api.blockcypher.com/v1/%s/main/addrs/%s?token=%s&unspentOnly=true",
-		strings.ToLower(chainName),
-		address,
-		h.blockcypherToken)
-
-	cmd := exec.CommandContext(ctx, "curl", "-s", "-H", "User-Agent: curl/7.81.0", url)
-	output, err := cmd.Output()
-	if err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			return nil, fmt.Errorf("failed to get utxo from blockcypher, err=%v, stderr=%s",
-				err, string(exitErr.Stderr))
-		}
-		return nil, fmt.Errorf("failed to get utxo from blockcypher, err=%v", err)
-	}
-
-	if len(output) == 0 {
-		return nil, fmt.Errorf("failed to get utxo from blockcypher, empty response")
-	}
-
-	if strings.Contains(string(output), "\"error\"") {
-		return nil, fmt.Errorf("failed to get utxo from blockcypher, api error: %s", string(output))
-	}
-
-	res := &BlockcypherUtxoRes{}
-	if err := json.Unmarshal(output, res); err != nil {
-		return nil, fmt.Errorf("failed to parse utxo response, err=%v, output=%s",
-			err, string(output))
-	}
-
-	if res == nil {
-		return nil, fmt.Errorf("failed to get balance from blockcypher, return is nil")
-	}
-
-	utxoList := &signing.UtxoList{}
-	network := getNetwork(chainName)
-	if network == "" {
-		return nil, fmt.Errorf("failed to get network for %s", chainName)
-	}
-
-	for _, v := range res.Txrefs {
-		if v.Confirmed == "" {
-			continue
-		} else if v.Confirmations == 0 {
-			continue
-		} else if v.Value <= 1000000 {
-			continue
-		}
-
-		pubKeyScript, err := walletutxo.AddressToScriptPubKey(address, network)
-		if err != nil {
-			return nil, fmt.Errorf("failed to AddressToScriptPubKey, addr=%s, err=%v", address, err)
-		}
-
-		utxo := &signing.UtxoInfo{
-			Hash:   v.TxHash,
-			Script: pubKeyScript,
-			Index:  strconv.FormatInt(v.TxOutputN, 10),
-			Value:  strconv.FormatInt(v.Value, 10),
-		}
-		utxoList.List = append(utxoList.List, utxo)
-	}
-
 	return utxoList, nil
 }
 func (h *Handler) scan() (*httpc.Request, error) {
@@ -787,6 +588,13 @@ func (h *Handler) scan() (*httpc.Request, error) {
 		return nil, fmt.Errorf("scan API URL is not configured")
 	}
 	return h.scanApi, nil
+}
+
+func (h *Handler) blockcypher(chainName string) (*httpc.Request, error) {
+	if chainName == "DOGE" {
+		return h.dogeApi, nil
+	}
+	return h.scan()
 }
 
 func (h *Handler) blockcypherQuery() url.Values {
