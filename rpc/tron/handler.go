@@ -18,17 +18,13 @@ import (
 var _ chainrpc.BasicChainHandler = (*Handler)(nil)
 
 type Handler struct {
-	rpc      *httpc.Request
-	tronGrid *httpc.Request
+	rpc *httpc.Request
 }
 
 func NewHandler(rpcUrl string) (*Handler, error) {
 	h := &Handler{}
 
 	h.rpc = httpc.NewRequest(rpcUrl, nil)
-	h.tronGrid = httpc.NewRequest("https://api.trongrid.io", map[string]string{
-		"TRON_PRO_API_KEY": "8dc8fb48-b87d-427e-821f-95b7160f2b51",
-	})
 	return h, nil
 }
 
