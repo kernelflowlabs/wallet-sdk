@@ -466,7 +466,9 @@ func (h *Handler) getTxStatusForDOGE(ctx context.Context, hash string) (*chainrp
 }
 
 func (h *Handler) getByteFeeFromBlockcypher(ctx context.Context, chainName string) (string, error) {
-	h.bcLimit()
+	if err := h.bcLimit(ctx); err != nil {
+		return "", err
+	}
 	out := &BlockcypherFeeRes{}
 	path := "v1/" + strings.ToLower(chainName) + "/main"
 	scanApi, err := h.blockcypher(chainName)
@@ -490,7 +492,9 @@ func (h *Handler) getByteFeeFromBlockcypher(ctx context.Context, chainName strin
 	return decimal.NewFromFloat(feePerByte).Ceil().String(), nil
 }
 func (h *Handler) getBalanceFromBlockcypher(ctx context.Context, chainName, address string) (string, error) {
-	h.bcLimit()
+	if err := h.bcLimit(ctx); err != nil {
+		return "", err
+	}
 	path := "v1/" + strings.ToLower(chainName) + "/main/addrs/" + address
 	res := &BlockcypherUtxoRes{}
 
@@ -509,7 +513,9 @@ func (h *Handler) getBalanceFromBlockcypher(ctx context.Context, chainName, addr
 	return strconv.FormatInt(res.FinalBalance, 10), nil
 }
 func (h *Handler) getTxStatusFromBlockcypher(ctx context.Context, chainName, hash string) (*chainrpc.TxResult, error) {
-	h.bcLimit()
+	if err := h.bcLimit(ctx); err != nil {
+		return nil, err
+	}
 	path := "v1/" + strings.ToLower(chainName) + "/main/txs/" + hash
 	res := &BlockcypherTxRes{}
 	scanApi, err := h.blockcypher(chainName)
@@ -539,7 +545,9 @@ func (h *Handler) getTxStatusFromBlockcypher(ctx context.Context, chainName, has
 	}
 }
 func (h *Handler) getUtxoFromBlockcypher(ctx context.Context, chainName, address string) (*signing.UtxoList, error) {
-	h.bcLimit()
+	if err := h.bcLimit(ctx); err != nil {
+		return nil, err
+	}
 	path := "v1/" + strings.ToLower(chainName) + "/main/addrs/" + address
 	res := &BlockcypherUtxoRes{}
 
@@ -605,20 +613,27 @@ func (h *Handler) blockcypherQuery() url.Values {
 	return query
 }
 
-func (h *Handler) bcLimit() {
-	h.bcMu.Lock()
-	defer h.bcMu.Unlock()
-
+func (h *Handler) bcLimit(ctx context.Context) error {
 	minInterval := 5 * time.Second
 
-	now := time.Now()
-	elapsed := now.Sub(h.bcLastReq)
+	for {
+		h.bcMu.Lock()
+		wait := minInterval - time.Since(h.bcLastReq)
+		if wait <= 0 {
+			h.bcLastReq = time.Now()
+			h.bcMu.Unlock()
+			return nil
+		}
+		h.bcMu.Unlock()
 
-	if elapsed < minInterval {
-		time.Sleep(minInterval - elapsed)
+		timer := time.NewTimer(wait)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
 	}
-
-	h.bcLastReq = time.Now()
 }
 
 func getConfirmation(network string) uint64 {
