@@ -539,8 +539,14 @@ func (h *Handler) InquireChain(ctx context.Context, instruction, params string) 
 		if err != nil {
 			return "", fmt.Errorf("failed to parse ABI: %v", err)
 		}
-		transferData := make([]byte, 0)
-		input, err := contract.Pack("getL1Fee", transferData)
+		if params == "" {
+			return "", fmt.Errorf("getOpL1Fee requires the serialized transaction as params")
+		}
+		txBytes, err := hex.DecodeString(strings.TrimPrefix(params, "0x"))
+		if err != nil {
+			return "", fmt.Errorf("invalid transaction hex: %v", err)
+		}
+		input, err := contract.Pack("getL1Fee", txBytes)
 		if err != nil {
 			return "", fmt.Errorf("failed to pack input: %v", err)
 		}
