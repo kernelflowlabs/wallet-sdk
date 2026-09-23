@@ -12,8 +12,6 @@ const (
 	hashLenBytes     = sha512.Size256
 )
 
-var MinBaseCoinValue uint64 = 200000
-
 type (
 	Address [hashLenBytes]byte
 	Digest  [hashLenBytes]byte

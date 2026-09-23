@@ -70,9 +70,6 @@ func (tx *TxBuilder) Build() error {
 			return fmt.Errorf("fail to ParseUint for Amount, err=%v", err)
 		}
 		if tx.Ingredient.ContractAddress == signing.MagicContactAddressForNative {
-			if amount < MinBaseCoinValue {
-				return fmt.Errorf("min amount to send is 0.2")
-			}
 			ntx.Type = "pay"
 			ntx.paymentTxnFields = paymentTxnFields{
 				Receiver: recipientBytes,
