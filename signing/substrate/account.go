@@ -93,10 +93,10 @@ func (a *Account) VerifySignData(data, sig []byte) bool {
 // Convention: path is "//cointype//index", e.g. "//354//0" for DOT account 0.
 // The coin type segment is stripped — it is for client-side identification only.
 // Account index 0 maps to the root key (empty path), which is the standard
-// Polkadot/Substrate address. Index 1 maps to "//0", index 2 to "//1", etc.
+// Polkadot/Substrate address. Every other index is kept as it was given.
 //
 //	"//354//0"  →  ""     (root key, account 0)
-//	"//354//1"  →  "//0"  (account 1)
+//	"//354//1"  →  "//1"  (account 1)
 //	"//434//0"  →  ""     (root key, KSM account 0)
 //	"//0"       →  ""     (legacy shorthand, kept for compatibility)
 func normalizePath(path string) string {
