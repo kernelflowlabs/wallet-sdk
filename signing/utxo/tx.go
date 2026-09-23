@@ -13,6 +13,7 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/btcutil/psbt"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -325,14 +326,7 @@ const (
 )
 
 func estimateVBytes(network string, numInputs, numOutputs int) int64 {
-	perInput := int64(vbytesP2WPKHInput)
-	switch network {
-	case NetworkEnumForBTCP2TR:
-		perInput = vbytesP2TRInput
-	case NetworkEnumForDOGE:
-		perInput = bytesP2PKHInput
-	}
-	return int64(numInputs)*perInput + int64(numOutputs)*bytesOutput + bytesOverhead
+	return int64(numInputs)*perInputVBytes(network) + int64(numOutputs)*bytesOutput + bytesOverhead
 }
 
 func buildMemoScript(memo string) ([]byte, error) {
@@ -357,11 +351,41 @@ func memoOutputVBytes(script []byte) int64 {
 	if script == nil {
 		return 0
 	}
-	return int64(8 + wire.VarIntSerializeSize(uint64(len(script))) + len(script))
+	return outputVBytes(script)
 }
 
 func estimateFee(network string, byteFee int64, numInputs, numOutputs int) int64 {
 	return estimateVBytes(network, numInputs, numOutputs) * byteFee
+}
+
+func outputVBytes(script []byte) int64 {
+	return int64(8 + wire.VarIntSerializeSize(uint64(len(script))) + len(script))
+}
+
+func perInputVBytes(network string) int64 {
+	switch network {
+	case NetworkEnumForBTCP2TR:
+		return vbytesP2TRInput
+	case NetworkEnumForDOGE:
+		return bytesP2PKHInput
+	}
+	return vbytesP2WPKHInput
+}
+
+func estimateFeeForScripts(network string, byteFee int64, numInputs int, outScripts ...[]byte) int64 {
+	vbytes := int64(numInputs)*perInputVBytes(network) + bytesOverhead
+	for _, script := range outScripts {
+		vbytes += outputVBytes(script)
+	}
+	return vbytes * byteFee
+}
+
+func scriptForAddress(address string, params *chaincfg.Params, allowSegwit bool) ([]byte, error) {
+	addr, err := decodeAddressForNet(address, params, allowSegwit)
+	if err != nil {
+		return nil, err
+	}
+	return txscript.PayToAddrScript(addr)
 }
 
 type (
@@ -414,6 +438,14 @@ func buildForBTC(i *Ingredient) ([]string, string, error) {
 
 	byteFee, _ := strconv.ParseInt(i.ByteFee, 10, 64)
 	numInputs := len(i.Utxos.List)
+	recipientScript, err := scriptForAddress(i.Recipient, &params, true)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to PayToAddrScript for recipient, err=%v", err)
+	}
+	changeScript, err := scriptForAddress(i.Sender, &params, true)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to PayToAddrScript for sender, err=%v", err)
+	}
 	memoScript, err := buildMemoScript(i.Memo)
 	if err != nil {
 		return nil, "", err
@@ -422,7 +454,7 @@ func buildForBTC(i *Ingredient) ([]string, string, error) {
 	var toAddrArr []string
 	var toAmountArr []int64
 	if i.Amount == signing.MagicNumberForMaxAmount {
-		fee := estimateFee(NetworkEnumForBTC, byteFee, numInputs, 1) + memoFee
+		fee := estimateFeeForScripts(NetworkEnumForBTC, byteFee, numInputs, recipientScript) + memoFee
 		send := totalHas - fee
 		if send < DefaultDust {
 			return nil, "", fmt.Errorf("sweep amount below dust: totalHas=%d, fee=%d", totalHas, fee)
@@ -436,13 +468,13 @@ func buildForBTC(i *Ingredient) ([]string, string, error) {
 		}
 		toAddrArr = append(toAddrArr, i.Recipient)
 		toAmountArr = append(toAmountArr, value)
-		feeWithChange := estimateFee(NetworkEnumForBTC, byteFee, numInputs, 2) + memoFee
+		feeWithChange := estimateFeeForScripts(NetworkEnumForBTC, byteFee, numInputs, recipientScript, changeScript) + memoFee
 		change := totalHas - feeWithChange - value
 		if change >= DefaultDust {
 			toAddrArr = append(toAddrArr, i.Sender)
 			toAmountArr = append(toAmountArr, change)
 		} else {
-			feeNoChange := estimateFee(NetworkEnumForBTC, byteFee, numInputs, 1) + memoFee
+			feeNoChange := estimateFeeForScripts(NetworkEnumForBTC, byteFee, numInputs, recipientScript) + memoFee
 			if totalHas-feeNoChange-value < 0 {
 				return nil, "", fmt.Errorf("value too large, totalHas=%d, value=%d, fee=%d", totalHas, value, feeNoChange)
 			}
@@ -557,6 +589,11 @@ func buildForBTCP2TR(i *Ingredient) ([]string, string, error) {
 		return nil, "", fmt.Errorf("failed to PayToAddrScript for senderAddr, err=%v", err)
 	}
 
+	recipientScript, err := scriptForAddress(i.Recipient, &params, true)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to PayToAddrScript for recipient, err=%v", err)
+	}
+
 	byteFee, _ := strconv.ParseInt(i.ByteFee, 10, 64)
 	numInputs := len(i.Utxos.List)
 	memoScript, err := buildMemoScript(i.Memo)
@@ -567,7 +604,7 @@ func buildForBTCP2TR(i *Ingredient) ([]string, string, error) {
 	var toAddrArr []string
 	var toAmountArr []int64
 	if i.Amount == signing.MagicNumberForMaxAmount {
-		fee := estimateFee(NetworkEnumForBTCP2TR, byteFee, numInputs, 1) + memoFee
+		fee := estimateFeeForScripts(NetworkEnumForBTCP2TR, byteFee, numInputs, recipientScript) + memoFee
 		send := totalHas - fee
 		if send < DefaultDust {
 			return nil, "", fmt.Errorf("sweep amount below dust: totalHas=%d, fee=%d", totalHas, fee)
@@ -581,13 +618,13 @@ func buildForBTCP2TR(i *Ingredient) ([]string, string, error) {
 		}
 		toAddrArr = append(toAddrArr, i.Recipient)
 		toAmountArr = append(toAmountArr, value)
-		feeWithChange := estimateFee(NetworkEnumForBTCP2TR, byteFee, numInputs, 2) + memoFee
+		feeWithChange := estimateFeeForScripts(NetworkEnumForBTCP2TR, byteFee, numInputs, recipientScript, pkData) + memoFee
 		change := totalHas - feeWithChange - value
 		if change >= DefaultDust {
 			toAddrArr = append(toAddrArr, i.Sender)
 			toAmountArr = append(toAmountArr, change)
 		} else {
-			feeNoChange := estimateFee(NetworkEnumForBTCP2TR, byteFee, numInputs, 1) + memoFee
+			feeNoChange := estimateFeeForScripts(NetworkEnumForBTCP2TR, byteFee, numInputs, recipientScript) + memoFee
 			if totalHas-feeNoChange-value < 0 {
 				return nil, "", fmt.Errorf("value too large, totalHas=%d, value=%d, fee=%d", totalHas, value, feeNoChange)
 			}
@@ -665,10 +702,18 @@ func buildForLTC(i *Ingredient) ([]string, string, error) {
 	}
 	byteFee, _ := strconv.ParseInt(i.ByteFee, 10, 64)
 	numInputs := len(i.Utxos.List)
+	recipientScript, err := scriptForAddress(i.Recipient, &params, true)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to PayToAddrScript for recipient, err=%v", err)
+	}
+	changeScript, err := scriptForAddress(i.Sender, &params, true)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to PayToAddrScript for sender, err=%v", err)
+	}
 	var toAddrArr []string
 	var toAmountArr []int64
 	if i.Amount == signing.MagicNumberForMaxAmount {
-		fee := estimateFee(NetworkEnumForLTC, byteFee, numInputs, 1)
+		fee := estimateFeeForScripts(NetworkEnumForLTC, byteFee, numInputs, recipientScript)
 		send := totalHas - fee
 		if send < DefaultDust {
 			return nil, "", fmt.Errorf("sweep amount below dust: totalHas=%d, fee=%d", totalHas, fee)
@@ -682,13 +727,13 @@ func buildForLTC(i *Ingredient) ([]string, string, error) {
 		}
 		toAddrArr = append(toAddrArr, i.Recipient)
 		toAmountArr = append(toAmountArr, value)
-		feeWithChange := estimateFee(NetworkEnumForLTC, byteFee, numInputs, 2)
+		feeWithChange := estimateFeeForScripts(NetworkEnumForLTC, byteFee, numInputs, recipientScript, changeScript)
 		change := totalHas - feeWithChange - value
 		if change >= DefaultDust {
 			toAddrArr = append(toAddrArr, i.Sender)
 			toAmountArr = append(toAmountArr, change)
 		} else {
-			feeNoChange := estimateFee(NetworkEnumForLTC, byteFee, numInputs, 1)
+			feeNoChange := estimateFeeForScripts(NetworkEnumForLTC, byteFee, numInputs, recipientScript)
 			if totalHas-feeNoChange-value < 0 {
 				return nil, "", fmt.Errorf("value too large, totalHas=%d, value=%d, fee=%d", totalHas, value, feeNoChange)
 			}
@@ -910,10 +955,18 @@ func buildForSYS(i *Ingredient) ([]string, string, error) {
 
 	byteFee, _ := strconv.ParseInt(i.ByteFee, 10, 64)
 	numInputs := len(i.Utxos.List)
+	recipientScript, err := scriptForAddress(i.Recipient, &params, true)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to PayToAddrScript for recipient, err=%v", err)
+	}
+	changeScript, err := scriptForAddress(i.Sender, &params, true)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to PayToAddrScript for sender, err=%v", err)
+	}
 	var toAddrArr []string
 	var toAmountArr []int64
 	if i.Amount == signing.MagicNumberForMaxAmount {
-		fee := estimateFee(NetworkEnumForSYS, byteFee, numInputs, 1)
+		fee := estimateFeeForScripts(NetworkEnumForSYS, byteFee, numInputs, recipientScript)
 		send := totalHas - fee
 		if send < DefaultDust {
 			return nil, "", fmt.Errorf("sweep amount below dust: totalHas=%d, fee=%d", totalHas, fee)
@@ -927,13 +980,13 @@ func buildForSYS(i *Ingredient) ([]string, string, error) {
 		}
 		toAddrArr = append(toAddrArr, i.Recipient)
 		toAmountArr = append(toAmountArr, value)
-		feeWithChange := estimateFee(NetworkEnumForSYS, byteFee, numInputs, 2)
+		feeWithChange := estimateFeeForScripts(NetworkEnumForSYS, byteFee, numInputs, recipientScript, changeScript)
 		change := totalHas - feeWithChange - value
 		if change >= DefaultDust {
 			toAddrArr = append(toAddrArr, i.Sender)
 			toAmountArr = append(toAmountArr, change)
 		} else {
-			feeNoChange := estimateFee(NetworkEnumForSYS, byteFee, numInputs, 1)
+			feeNoChange := estimateFeeForScripts(NetworkEnumForSYS, byteFee, numInputs, recipientScript)
 			if totalHas-feeNoChange-value < 0 {
 				return nil, "", fmt.Errorf("value too large")
 			}
