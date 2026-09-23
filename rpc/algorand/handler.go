@@ -22,17 +22,25 @@ type Handler struct {
 	indexer *httpc.Request
 }
 
-func newAlgodRequest(url string) (*httpc.Request, error) {
+func newAlgorandRequest(url, tokenHeader string) (*httpc.Request, error) {
 	tmp := strings.Split(url, "@")
 	headers := map[string]string{"Content-Type": "application/json"}
 	switch len(tmp) {
 	case 1:
 	case 2:
-		headers["X-Algo-API-Token"] = tmp[1]
+		headers[tokenHeader] = tmp[1]
 	default:
 		return nil, fmt.Errorf("invalid params")
 	}
 	return httpc.NewRequest(tmp[0], headers), nil
+}
+
+func newAlgodRequest(url string) (*httpc.Request, error) {
+	return newAlgorandRequest(url, "X-Algo-API-Token")
+}
+
+func newIndexerRequest(url string) (*httpc.Request, error) {
+	return newAlgorandRequest(url, "X-Indexer-API-Token")
 }
 
 func NewHandler(rpcUrl string) (*Handler, error) {
@@ -43,7 +51,7 @@ func NewHandler(rpcUrl string) (*Handler, error) {
 	}
 	h := &Handler{rpc: rpc}
 	if len(parts) == 2 && strings.TrimSpace(parts[1]) != "" {
-		indexer, err := newAlgodRequest(strings.TrimSpace(parts[1]))
+		indexer, err := newIndexerRequest(strings.TrimSpace(parts[1]))
 		if err != nil {
 			return nil, err
 		}
