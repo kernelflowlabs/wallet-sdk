@@ -280,6 +280,7 @@ func (tx *TxBuilder) SetUnsignedHex(unsignedHex string) {
 const DefaultInputBytes = 148
 const DefaultOutputBytes = 34
 const DefaultDust = 546
+const MaxMemoBytes = 80
 const DogeDust = 100000
 
 const (
@@ -305,10 +306,14 @@ func buildMemoScript(memo string) ([]byte, error) {
 	if memo == "" {
 		return nil, nil
 	}
-	if len(memo) > 80 {
-		return nil, fmt.Errorf("memo too long")
+	data, err := hex.DecodeString(strings.TrimPrefix(memo, "0x"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid memo: %v", err)
 	}
-	script, err := txscript.NewScriptBuilder().AddOp(txscript.OP_RETURN).AddData([]byte(memo)).Script()
+	if len(data) > MaxMemoBytes {
+		return nil, fmt.Errorf("memo too long: %d bytes, max %d", len(data), MaxMemoBytes)
+	}
+	script, err := txscript.NewScriptBuilder().AddOp(txscript.OP_RETURN).AddData(data).Script()
 	if err != nil {
 		return nil, fmt.Errorf("failed to Script for memo, err=%v", err)
 	}
