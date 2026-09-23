@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/btcutil/psbt"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -89,6 +91,8 @@ func (tx *TxBuilder) Build() error {
 	switch tx.network {
 	case NetworkEnumForBTC:
 		sigHash, unsignedHex, err = buildForBTC(tx.Ingredient)
+	case NetworkEnumForBTCP2TR:
+		sigHash, unsignedHex, err = buildForBTCP2TR(tx.Ingredient)
 	case NetworkEnumForLTC:
 		sigHash, unsignedHex, err = buildForLTC(tx.Ingredient)
 	case NetworkEnumForDOGE:
@@ -112,6 +116,9 @@ func (tx *TxBuilder) Sign(privateKey []byte) (string, error) {
 	} else if len(tx.sigHash) < 1 {
 		return "", fmt.Errorf("tx.SigHash too short")
 	}
+	if tx.network == NetworkEnumForBTCP2TR {
+		return tx.signTaproot(privateKey)
+	}
 	var signatureList string
 	for idx, v := range tx.sigHash {
 		hash, err := hex.DecodeString(v)
@@ -130,6 +137,24 @@ func (tx *TxBuilder) Sign(privateKey []byte) (string, error) {
 		}
 	}
 	return signatureList, nil
+}
+
+func (tx *TxBuilder) signTaproot(privateKey []byte) (string, error) {
+	prvKey, _ := btcec.PrivKeyFromBytes(privateKey)
+	tweaked := txscript.TweakTaprootPrivKey(*prvKey, nil)
+	signatures := make([]string, 0, len(tx.sigHash))
+	for _, v := range tx.sigHash {
+		hash, err := hex.DecodeString(v)
+		if err != nil {
+			return "", fmt.Errorf("failed to DecodeString for hash, err=%v", err)
+		}
+		sig, err := schnorr.Sign(tweaked, hash)
+		if err != nil {
+			return "", fmt.Errorf("failed to Sign with schnorr, err=%v", err)
+		}
+		signatures = append(signatures, hex.EncodeToString(sig.Serialize()))
+	}
+	return strings.Join(signatures, "_"), nil
 }
 
 func (tx *TxBuilder) ConcatSignature(signature string, isDerFormat bool) (string, error) {
@@ -210,6 +235,14 @@ func (tx *TxBuilder) ConcatSignature(signature string, isDerFormat bool) (string
 			}
 			txHash = msgTx.TxHash().String()
 		}
+	case NetworkEnumForBTCP2TR:
+		for idx, txin := range msgTx.TxIn {
+			if len(sig[idx]) != schnorr.SignatureSize {
+				return "", fmt.Errorf("taproot signature %d has %d bytes, want %d", idx, len(sig[idx]), schnorr.SignatureSize)
+			}
+			txin.Witness = wire.TxWitness{sig[idx]}
+		}
+		txHash = msgTx.TxHash().String()
 	case NetworkEnumForLTC:
 		for idx, txin := range msgTx.TxIn {
 			txin.Witness = wire.TxWitness{sig[idx], pkData}
@@ -498,6 +531,127 @@ func buildForBTC(i *Ingredient) ([]string, string, error) {
 
 	return sigHash, unsignedHex, nil
 }
+func buildForBTCP2TR(i *Ingredient) ([]string, string, error) {
+	if i.IsPSBT {
+		return nil, "", fmt.Errorf("PSBT is not supported for taproot")
+	}
+	var sigHash []string
+	txVersion := int32(wire.TxVersion)
+	sequenceNum := wire.MaxTxInSequenceNum
+	params := btcParams
+	totalHas := int64(0)
+	for _, v := range i.Utxos.List {
+		value, _ := strconv.ParseInt(v.Value, 10, 64)
+		totalHas += value
+	}
+
+	senderAddr, err := decodeAddressForNet(i.Sender, &params, true)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to DecodeAddress for sender, err=%v", err)
+	}
+	if _, ok := senderAddr.(*btcutil.AddressTaproot); !ok {
+		return nil, "", fmt.Errorf("sender %s is not a taproot address", i.Sender)
+	}
+	pkData, err := txscript.PayToAddrScript(senderAddr)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to PayToAddrScript for senderAddr, err=%v", err)
+	}
+
+	byteFee, _ := strconv.ParseInt(i.ByteFee, 10, 64)
+	numInputs := len(i.Utxos.List)
+	memoScript, err := buildMemoScript(i.Memo)
+	if err != nil {
+		return nil, "", err
+	}
+	memoFee := memoOutputVBytes(memoScript) * byteFee
+	var toAddrArr []string
+	var toAmountArr []int64
+	if i.Amount == signing.MagicNumberForMaxAmount {
+		fee := estimateFee(NetworkEnumForBTCP2TR, byteFee, numInputs, 1) + memoFee
+		send := totalHas - fee
+		if send < DefaultDust {
+			return nil, "", fmt.Errorf("sweep amount below dust: totalHas=%d, fee=%d", totalHas, fee)
+		}
+		toAddrArr = append(toAddrArr, i.Recipient)
+		toAmountArr = append(toAmountArr, send)
+	} else {
+		value, _ := strconv.ParseInt(i.Amount, 10, 64)
+		if value < DefaultDust {
+			return nil, "", fmt.Errorf("amount below dust: %d", value)
+		}
+		toAddrArr = append(toAddrArr, i.Recipient)
+		toAmountArr = append(toAmountArr, value)
+		feeWithChange := estimateFee(NetworkEnumForBTCP2TR, byteFee, numInputs, 2) + memoFee
+		change := totalHas - feeWithChange - value
+		if change >= DefaultDust {
+			toAddrArr = append(toAddrArr, i.Sender)
+			toAmountArr = append(toAmountArr, change)
+		} else {
+			feeNoChange := estimateFee(NetworkEnumForBTCP2TR, byteFee, numInputs, 1) + memoFee
+			if totalHas-feeNoChange-value < 0 {
+				return nil, "", fmt.Errorf("value too large, totalHas=%d, value=%d, fee=%d", totalHas, value, feeNoChange)
+			}
+		}
+	}
+
+	msgTx := wire.NewMsgTx(txVersion)
+	prevOuts := make(map[wire.OutPoint]*wire.TxOut, numInputs)
+	for _, utxo := range i.Utxos.List {
+		utxoHash, err := chainhash.NewHashFromStr(utxo.Hash)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to NewHashFromStr, err=%v", err)
+		}
+		index, _ := strconv.ParseUint(utxo.Index, 10, 64)
+		outPoint := wire.NewOutPoint(utxoHash, uint32(index))
+		txIn := wire.NewTxIn(outPoint, nil, nil)
+		txIn.Sequence = sequenceNum
+		msgTx.AddTxIn(txIn)
+
+		pkScript := pkData
+		if utxo.Script != "" {
+			pkScript, err = hex.DecodeString(utxo.Script)
+			if err != nil {
+				return nil, "", fmt.Errorf("failed to DecodeString for utxo script, err=%v", err)
+			}
+		}
+		if !txscript.IsPayToTaproot(pkScript) {
+			return nil, "", fmt.Errorf("utxo %s:%d is not a taproot output", utxo.Hash, index)
+		}
+		amount, _ := strconv.ParseInt(utxo.Value, 10, 64)
+		prevOuts[*outPoint] = wire.NewTxOut(amount, pkScript)
+	}
+	for idx, toAddr := range toAddrArr {
+		toAddress, err := decodeAddressForNet(toAddr, &params, true)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to DecodeAddress for toAddr, err=%v", err)
+		}
+		toAddressBytes, err := txscript.PayToAddrScript(toAddress)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to PayToAddrScript for toAddress, err=%v", err)
+		}
+		msgTx.AddTxOut(wire.NewTxOut(toAmountArr[idx], toAddressBytes))
+	}
+	if memoScript != nil {
+		msgTx.AddTxOut(wire.NewTxOut(0, memoScript))
+	}
+
+	fetcher := txscript.NewMultiPrevOutFetcher(prevOuts)
+	txSigHashes := txscript.NewTxSigHashes(msgTx, fetcher)
+	for idx := range msgTx.TxIn {
+		hash, err := txscript.CalcTaprootSignatureHash(txSigHashes, txscript.SigHashDefault, msgTx, idx, fetcher)
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to CalcTaprootSignatureHash, err=%v", err)
+		}
+		sigHash = append(sigHash, hex.EncodeToString(hash))
+	}
+
+	var unsignedBytes bytes.Buffer
+	if err := msgTx.Serialize(&unsignedBytes); err != nil {
+		return nil, "", fmt.Errorf("failed to Serialize for msgTx, err=%v", err)
+	}
+	return sigHash, hex.EncodeToString(unsignedBytes.Bytes()), nil
+}
+
 func buildForLTC(i *Ingredient) ([]string, string, error) {
 	var sigHash []string
 	var unsignedHex string
