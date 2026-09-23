@@ -126,42 +126,14 @@ func (h *Handler) GetTransfersByHash(ctx context.Context, hash string,
 			})
 		}
 	} else if tx.Data.Contracts[0].Type == "TriggerSmartContract" {
-		data := tx.Data.Contracts[0].Parameter.Value.Data
-		if len(data) != 128+len(SignatureTransferMethod) ||
-			data[0:8] != SignatureTransferMethod {
+		transfers, changes, err := trc20TransfersFromLogs(txResult.Logs)
+		if err != nil {
 			result.Rejected = true
-			result.ErrMsg = "not a token transfer"
+			result.ErrMsg = err.Error()
 			return result, nil
 		}
-		transfer.Sender = wallettron.ConvertFromHex(tx.Data.Contracts[0].Parameter.Value.OwnerAddress)
-		transfer.ContractAddress = wallettron.ConvertFromHex(tx.Data.Contracts[0].Parameter.Value.ContractAddress)
-		recipientHexAddr := "41" + data[len(SignatureTransferMethod)+
-			24:len(SignatureTransferMethod)+64]
-		transfer.Recipient = wallettron.ConvertFromHex(recipientHexAddr)
-		amt, ok := big.NewInt(0).SetString(data[len(SignatureTransferMethod)+64:], 16)
-		if !ok {
-			result.Rejected = true
-			result.ErrMsg = "failed to setString for amount"
-			return result, nil
-		}
-		transfer.Amount = amt.String()
-
-		if transfer.Sender != "" &&
-			transfer.Recipient != "" &&
-			transfer.Amount != "" &&
-			transfer.ContractAddress != "" {
-			result.Transfers = append(result.Transfers, transfer)
-			result.BalanceChange = append(result.BalanceChange, &chainrpc.BalanceChange{
-				Address:         transfer.Sender,
-				ContractAddress: transfer.ContractAddress,
-				Change:          new(big.Int).Neg(amt).String(),
-			})
-			result.BalanceChange = append(result.BalanceChange, &chainrpc.BalanceChange{
-				Address:         transfer.Recipient,
-				ContractAddress: transfer.ContractAddress,
-				Change:          amt.String(),
-			})
-		}
+		result.Transfers = append(result.Transfers, transfers...)
+		result.BalanceChange = append(result.BalanceChange, changes...)
 	} else {
 		result.Rejected = true
 		result.ErrMsg = "invalid tx type"
@@ -169,6 +141,45 @@ func (h *Handler) GetTransfersByHash(ctx context.Context, hash string,
 	}
 
 	return result, nil
+}
+
+func trc20TransfersFromLogs(logs []chainrpc.EvmLog) ([]*chainrpc.Transfer, []*chainrpc.BalanceChange, error) {
+	var transfers []*chainrpc.Transfer
+	var changes []*chainrpc.BalanceChange
+	for _, log := range logs {
+		topics := strings.Split(log.Topics, ",")
+		if len(topics) != 3 || !strings.EqualFold(strings.TrimPrefix(topics[0], "0x"), TransferEventTopic) {
+			continue
+		}
+		sender := topicToAddress(topics[1])
+		recipient := topicToAddress(topics[2])
+		contract := wallettron.ConvertFromHex("41" + strings.TrimPrefix(log.Address, "0x"))
+		amount, ok := new(big.Int).SetString(strings.TrimPrefix(log.Data, "0x"), 16)
+		if !ok || sender == "" || recipient == "" || contract == "" {
+			continue
+		}
+		transfers = append(transfers, &chainrpc.Transfer{
+			Sender:          sender,
+			Recipient:       recipient,
+			Amount:          amount.String(),
+			ContractAddress: contract,
+		})
+		changes = append(changes,
+			&chainrpc.BalanceChange{Address: sender, ContractAddress: contract, Change: new(big.Int).Neg(amount).String()},
+			&chainrpc.BalanceChange{Address: recipient, ContractAddress: contract, Change: amount.String()})
+	}
+	if len(transfers) == 0 {
+		return nil, nil, fmt.Errorf("no transfer events")
+	}
+	return transfers, changes, nil
+}
+
+func topicToAddress(topic string) string {
+	topic = strings.TrimPrefix(topic, "0x")
+	if len(topic) != 64 {
+		return ""
+	}
+	return wallettron.ConvertFromHex("41" + topic[24:])
 }
 
 func (h *Handler) GetAddressFee(ctx context.Context, address string) (wallettron.FreeGas, error) {
